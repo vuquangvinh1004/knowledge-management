@@ -382,13 +382,15 @@ class SettingsView(QWidget):
             if len(issues) > 20:
                 more = f"\n... và {len(issues) - 20} mục khác."
 
+            preview_text = "\n".join(preview_lines)
+
             QMessageBox.warning(
                 self,
                 "Phát hiện source-note thiếu file",
                 (
                     f"Tổng số phát hiện: {len(issues)}\n\n"
                     "Danh sách mẫu:\n"
-                    f"{'\n'.join(preview_lines)}"
+                    f"{preview_text}"
                     f"{more}\n\n"
                     "Đây là thao tác chỉ xem. Không có thay đổi dữ liệu."
                 ),
