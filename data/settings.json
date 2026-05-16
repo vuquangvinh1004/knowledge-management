@@ -1,7 +1,7 @@
 {
   "window_width": 1280,
   "window_height": 800,
-  "window_maximized": false,
+  "window_maximized": true,
   "sidebar_width": 220,
   "dual_pane_split": 0.5,
   "theme": "light",
