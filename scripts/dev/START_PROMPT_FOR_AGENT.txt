@@ -1,0 +1,3 @@
+Đọc START_HERE_FOR_AI_AGENT.md, PKM_ARCHITECTURE.md, PKM_ROADMAP.md và PKM_SPEC_FINAL.md trước khi code.
+Tuân thủ tech stack, kiến trúc phân lớp, source-grounded workflow, extraction rules, export contracts, roadmap phase và checklist sau mỗi task.
+Không tự ý thay đổi schema, source anchor format, storage layout, markdown contract hoặc delete policy nếu chưa cập nhật tài liệu tương ứng.

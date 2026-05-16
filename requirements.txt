@@ -1,0 +1,9 @@
+PySide6>=6.6
+SQLAlchemy>=2.0
+alembic>=1.13
+PyMuPDF>=1.24
+pdfplumber>=0.11
+markdown>=3.6
+python-slugify>=8.0
+pydantic>=2.7
+loguru>=0.7
