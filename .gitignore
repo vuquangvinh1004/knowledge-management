@@ -17,11 +17,22 @@ build/
 venv/
 env/
 
+# --- Dữ liệu người dùng (riêng tư, chỉ lưu local) ---
 data/database/*.db
+data/notes/*
+data/sources/*
+data/assets/*
+data/settings.json
 data/backups/*
 data/temp/*
 data/logs/*
 data/exports/*
+
+# Giữ cấu trúc thư mục
+!data/database/.gitkeep
+!data/notes/.gitkeep
+!data/sources/.gitkeep
+!data/assets/.gitkeep
 !data/backups/.gitkeep
 !data/temp/.gitkeep
 !data/logs/.gitkeep

@@ -1,2 +1,0 @@
-# chuỗi cung ứng
-
