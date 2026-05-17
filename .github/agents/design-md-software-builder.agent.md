@@ -151,11 +151,20 @@ Config Layer      →  settings, paths, app lifecycle                   — cấ
 
 ---
 
-## 6. Design System — DESIGN.md là hiến pháp trực quan
+## 6. Design System — DESIGN.md + design.md-0.1.0 là hiến pháp trực quan
+
+### Vị trí tham khảo chính
+- **[DESIGN.md](DESIGN.md)** — Design system của PKM app (colors, typography, layout, components)
+- **[design.md-0.1.0/](design.md-0.1.0/)** — Design.md reference library (107 files) với:
+  - Format spec và best practices
+  - 3 ví dụ hoàn chỉnh: atmospheric-glass, paws-and-paths, totality-festival
+  - CLI linter tool để validate token refs, contrast, missing sections
+  - Token export format (design_tokens.json)
 
 ### Quy tắc cốt lõi
 - Nếu `DESIGN.md` tồn tại: YAML front matter là normative, prose là ngôn ngữ style chủ đích.
 - Nếu `DESIGN.md` chưa tồn tại: **bắt buộc** draft DESIGN.md trước khi viết bất kỳ UI code nào.
+- **Mỗi khi phát triển UI**: tham khảo design.md-0.1.0/examples/* để học pattern token-driven implementation.
 - Mọi giá trị visual (màu, font, spacing, radius) phải đến từ token — không hardcode.
 - Dùng primary color cho đúng một hành động quan trọng nhất trên mỗi màn.
 - WCAG AA contrast bắt buộc cho toàn bộ text thông thường.
@@ -165,7 +174,7 @@ Config Layer      →  settings, paths, app lifecycle                   — cấ
 1. Xác nhận hoặc tạo `DESIGN.md` với đầy đủ: Overview, Colors, Typography, Layout, Elevation & Depth, Shapes, Components, Do's and Don'ts.
 2. Định nghĩa tokens trước: màu, typography, spacing, radius, component states.
 3. Validate: `npx @google/design.md lint DESIGN.md` — kiểm tra broken token refs, missing primary color, missing typography, contrast.
-4. Map tokens vào implementation: QSS variables, QSS stylesheet, widget props.
+4. Tham khảo design.md-0.1.0/examples để biết cách map tokens vào code (CSS variables, QSS stylesheet).
 5. Build UI chỉ sau khi design system đủ ổn định.
 
 ---
