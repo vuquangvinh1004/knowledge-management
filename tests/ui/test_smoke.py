@@ -409,6 +409,45 @@ class TestMarkdownSnippetDialogSmoke:
         assert dlg._btn_edit.text() == "Sửa"
         assert dlg._btn_new.text() == "Tạo mới"
 
+    def test_new_snippet_persists_even_without_pressing_save_button(self, qtbot, mock_settings, monkeypatch):
+        from core.services.markdown_snippet_service import MarkdownSnippetService
+        from core.services.settings_service import SettingsService
+        from ui.widgets.dialogs import markdown_snippet_dialog as snippet_dialog_module
+
+        svc = MarkdownSnippetService(SettingsService())
+        svc._settings_service._settings = mock_settings
+
+        class _FakeCreateDialog:
+            DialogCode = snippet_dialog_module.QDialog.DialogCode
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def exec(self):
+                return self.DialogCode.Accepted
+
+            @property
+            def name_text(self):
+                return "My Snippet"
+
+            @property
+            def description_text(self):
+                return "Mo ta"
+
+            @property
+            def template_text(self):
+                return "Noi dung mau\n"
+
+        monkeypatch.setattr(snippet_dialog_module, "MarkdownSnippetEditDialog", _FakeCreateDialog)
+
+        dlg = snippet_dialog_module.MarkdownSnippetCustomizeDialog(svc)
+        qtbot.addWidget(dlg)
+        dlg._create_new()
+        dlg.reject()
+
+        available_names = [snippet.name for snippet in svc.list_available()]
+        assert "My Snippet" in available_names
+
 
 class TestNoteListEditorTabSmoke:
     def test_synthesis_create_tab_works_when_it_is_only_tab(self, qtbot, db_session, tmp_path, monkeypatch):

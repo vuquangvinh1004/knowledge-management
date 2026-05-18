@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont, QFontDatabase
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -54,6 +55,7 @@ class MarkdownSnippetEditDialog(QDialog):
         self._edit_template = QPlainTextEdit()
         self._edit_template.setPlaceholderText("Nhập cấu trúc mẫu sẽ chèn vào editor")
         self._edit_template.setMinimumHeight(220)
+        self._edit_template.setFont(_fixed_width_font())
         form.addRow("Cấu trúc mẫu", self._edit_template)
 
         layout.addLayout(form)
@@ -127,6 +129,7 @@ class MarkdownSnippetCustomizeDialog(QDialog):
         self._preview = QPlainTextEdit()
         self._preview.setReadOnly(True)
         self._preview.setMinimumHeight(160)
+        self._preview.setFont(_fixed_width_font())
         left_lay.addWidget(self._preview)
         content.addWidget(left, stretch=1)
 
@@ -210,8 +213,12 @@ class MarkdownSnippetCustomizeDialog(QDialog):
         if item.checkState() == Qt.CheckState.Checked:
             if snippet_id not in self._visible_ids:
                 self._visible_ids.append(snippet_id)
+                self._persist_changes()
             return
-        self._visible_ids = [current_id for current_id in self._visible_ids if current_id != snippet_id]
+        next_visible = [current_id for current_id in self._visible_ids if current_id != snippet_id]
+        if next_visible != self._visible_ids:
+            self._visible_ids = next_visible
+            self._persist_changes()
 
     def _mark_selected_visible(self) -> None:
         item = self._list.currentItem()
@@ -237,6 +244,7 @@ class MarkdownSnippetCustomizeDialog(QDialog):
                 built_in=current.built_in,
             )
             break
+        self._persist_changes()
         self._refresh_list()
 
     def _create_new(self) -> None:
@@ -256,6 +264,7 @@ class MarkdownSnippetCustomizeDialog(QDialog):
         )
         if snippet_id not in self._visible_ids:
             self._visible_ids.append(snippet_id)
+        self._persist_changes()
         self._refresh_list()
 
     def _delete_selected(self) -> None:
@@ -278,12 +287,17 @@ class MarkdownSnippetCustomizeDialog(QDialog):
             return
         self._catalog = [item for item in self._catalog if item.snippet_id != snippet.snippet_id]
         self._visible_ids = [snippet_id for snippet_id in self._visible_ids if snippet_id != snippet.snippet_id]
+        self._persist_changes()
         self._refresh_list()
 
     def _save_and_accept(self) -> None:
+        self._persist_changes()
+        self.accept()
+
+    def _persist_changes(self) -> None:
+        # Lưu ngay để không phụ thuộc vào việc người dùng có bấm Lưu cửa sổ hay lưu văn bản editor.
         self._snippet_service.save_catalog(self._catalog)
         self._snippet_service.set_visible_ids(self._visible_ids)
-        self.accept()
 
     def _build_custom_snippet_id(self, name: str) -> str:
         existing_ids = {snippet.snippet_id for snippet in self._catalog}
@@ -294,3 +308,8 @@ class MarkdownSnippetCustomizeDialog(QDialog):
             snippet_id = f"{base_slug}-{suffix}"
             suffix += 1
         return snippet_id
+
+
+def _fixed_width_font() -> QFont:
+    """Trả về font monospace khả dụng để hiển thị mẫu Markdown ổn định."""
+    return QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
