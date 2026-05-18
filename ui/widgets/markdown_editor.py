@@ -50,7 +50,9 @@ class _MarkdownSyntaxHighlighter(QSyntaxHighlighter):
     _HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.+)$")
     _TAG_PATTERN = re.compile(r"(?<!\w)#(?!\s)[\w\-]+", re.UNICODE)
     _WIKILINK_PATTERN = re.compile(r"\[\[([^\[\]\n]+)\]\]")
+    _MARKDOWN_LINK_PATTERN = re.compile(r"(?<!!)\[[^\]\n]+\]\([^\)\n]+\)")
     _BLOCKQUOTE_PATTERN = re.compile(r"^\s*>\s?.*")
+    _CHECKLIST_PATTERN = re.compile(r"^\s*-\s\[(?: |x|X)\]\s?.*")
     _TABLE_ROW_PATTERN = re.compile(r"^\s*\|.*\|\s*$")
     _INLINE_MATH_PATTERN = re.compile(r"(?<!\\)(?<!\$)\$(?!\$)(.+?)(?<!\\)\$(?!\$)")
     _INLINE_MATH_PAREN_PATTERN = re.compile(r"\\\((.+?)\\\)")
@@ -102,6 +104,10 @@ class _MarkdownSyntaxHighlighter(QSyntaxHighlighter):
         self._wikilink_format.setForeground(QColor("#0F766E"))
         self._wikilink_format.setFontItalic(True)
         self._wikilink_format.setUnderlineStyle(QTextCharFormat.UnderlineStyle.NoUnderline)
+
+        self._markdown_link_format = QTextCharFormat()
+        self._markdown_link_format.setForeground(QColor("#1D4ED8"))
+        self._markdown_link_format.setUnderlineStyle(QTextCharFormat.UnderlineStyle.SingleUnderline)
 
         self._blockquote_line_format = QTextCharFormat()
         self._blockquote_line_format.setForeground(QColor("#1F3B73"))
@@ -241,6 +247,9 @@ class _MarkdownSyntaxHighlighter(QSyntaxHighlighter):
                 match.end() - match.start(),
                 self._wikilink_format,
             )
+
+        for match in self._MARKDOWN_LINK_PATTERN.finditer(text):
+            self.setFormat(match.start(), match.end() - match.start(), self._markdown_link_format)
 
         for match in self._DISPLAY_MATH_INLINE_DOLLAR_PATTERN.finditer(text):
             self._highlight_math_span(text, match.start(), match.end(), is_display=True)
@@ -718,7 +727,7 @@ class MarkdownEditorWidget(QWidget):
         self._editor.setTabStopDistance(self._editor.fontMetrics().horizontalAdvance(" ") * 4)
 
     def _refresh_blockquote_overlays(self) -> None:
-        """Tô nền full-width cho các dòng blockquote (giống shading theo hàng)."""
+        """Tô nền full-width cho blockquote và checklist để tăng phân biệt khi soạn thảo."""
         try:
             selections: list[QTextEdit.ExtraSelection] = []
             block = self._editor.document().firstBlock()
@@ -729,6 +738,13 @@ class MarkdownEditorWidget(QWidget):
                     sel.cursor = QTextCursor(block)
                     sel.cursor.clearSelection()
                     sel.format.setBackground(QColor("#F8EEDB"))
+                    sel.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
+                    selections.append(sel)
+                elif _MarkdownSyntaxHighlighter._CHECKLIST_PATTERN.match(text):
+                    sel = QTextEdit.ExtraSelection()
+                    sel.cursor = QTextCursor(block)
+                    sel.cursor.clearSelection()
+                    sel.format.setBackground(QColor("#EFE7FF"))
                     sel.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
                     selections.append(sel)
                 block = block.next()
@@ -857,6 +873,8 @@ class MarkdownEditorWidget(QWidget):
                     and not self._hashtag_completer.popup().isVisible()
                     and not self._wikilink_completer.popup().isVisible()
                 ):
+                    if self._handle_checklist_enter():
+                        return True
                     if self._handle_blockquote_enter():
                         return True
 
@@ -914,6 +932,40 @@ class MarkdownEditorWidget(QWidget):
             return True
 
         cursor.insertText(f"\n{indent}> ")
+        return True
+
+    def _handle_checklist_enter(self) -> bool:
+        """Xử lý Enter trong checklist theo cơ chế auto-continue/exit.
+
+        - Enter trong dòng `- [ ] nội dung` hoặc `- [x] nội dung` -> tạo dòng mới `- [ ] `.
+        - Enter trên dòng chỉ có `- [ ]` -> thoát checklist.
+        """
+        cursor = self._editor.textCursor()
+        if cursor.hasSelection():
+            return False
+
+        block = cursor.block()
+        line_text = block.text()
+        match = re.match(r"^(\s*)-\s\[( |x|X)\]\s?(.*)$", line_text)
+        if not match:
+            return False
+
+        indent = match.group(1)
+        body = match.group(3)
+
+        if body.strip() == "":
+            start = block.position()
+            end = start + len(line_text)
+            cursor.beginEditBlock()
+            cursor.setPosition(start)
+            cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
+            cursor.removeSelectedText()
+            cursor.insertBlock()
+            cursor.endEditBlock()
+            self._editor.setTextCursor(cursor)
+            return True
+
+        cursor.insertText(f"\n{indent}- [ ] ")
         return True
 
     def _accept_current_hashtag_completion(self) -> bool:

@@ -134,9 +134,15 @@ class MarkdownSnippetCustomizeDialog(QDialog):
         content.addWidget(left, stretch=1)
 
         buttons_col = QVBoxLayout()
-        self._btn_add = QPushButton("Thêm")
-        self._btn_add.clicked.connect(self._mark_selected_visible)
-        buttons_col.addWidget(self._btn_add)
+        self._btn_move_up = QPushButton("↑")
+        self._btn_move_up.setToolTip("Đưa đối tượng đang chọn lên trên")
+        self._btn_move_up.clicked.connect(self._move_selected_up)
+        buttons_col.addWidget(self._btn_move_up)
+
+        self._btn_move_down = QPushButton("↓")
+        self._btn_move_down.setToolTip("Đưa đối tượng đang chọn xuống dưới")
+        self._btn_move_down.clicked.connect(self._move_selected_down)
+        buttons_col.addWidget(self._btn_move_down)
 
         self._btn_delete = QPushButton("Xóa")
         self._btn_delete.clicked.connect(self._delete_selected)
@@ -213,17 +219,10 @@ class MarkdownSnippetCustomizeDialog(QDialog):
         if item.checkState() == Qt.CheckState.Checked:
             if snippet_id not in self._visible_ids:
                 self._visible_ids.append(snippet_id)
-                self._persist_changes()
             return
         next_visible = [current_id for current_id in self._visible_ids if current_id != snippet_id]
         if next_visible != self._visible_ids:
             self._visible_ids = next_visible
-            self._persist_changes()
-
-    def _mark_selected_visible(self) -> None:
-        item = self._list.currentItem()
-        if item is not None:
-            item.setCheckState(Qt.CheckState.Checked)
 
     def _edit_selected(self) -> None:
         snippet = self._current_snippet()
@@ -244,7 +243,6 @@ class MarkdownSnippetCustomizeDialog(QDialog):
                 built_in=current.built_in,
             )
             break
-        self._persist_changes()
         self._refresh_list()
 
     def _create_new(self) -> None:
@@ -264,7 +262,6 @@ class MarkdownSnippetCustomizeDialog(QDialog):
         )
         if snippet_id not in self._visible_ids:
             self._visible_ids.append(snippet_id)
-        self._persist_changes()
         self._refresh_list()
 
     def _delete_selected(self) -> None:
@@ -287,17 +284,33 @@ class MarkdownSnippetCustomizeDialog(QDialog):
             return
         self._catalog = [item for item in self._catalog if item.snippet_id != snippet.snippet_id]
         self._visible_ids = [snippet_id for snippet_id in self._visible_ids if snippet_id != snippet.snippet_id]
-        self._persist_changes()
         self._refresh_list()
 
     def _save_and_accept(self) -> None:
-        self._persist_changes()
-        self.accept()
-
-    def _persist_changes(self) -> None:
-        # Lưu ngay để không phụ thuộc vào việc người dùng có bấm Lưu cửa sổ hay lưu văn bản editor.
+        self._rebuild_visible_ids_from_catalog_order()
         self._snippet_service.save_catalog(self._catalog)
         self._snippet_service.set_visible_ids(self._visible_ids)
+        self.accept()
+
+    def _move_selected_up(self) -> None:
+        row = self._list.currentRow()
+        if row <= 0:
+            return
+        self._catalog[row - 1], self._catalog[row] = self._catalog[row], self._catalog[row - 1]
+        self._refresh_list()
+        self._list.setCurrentRow(row - 1)
+
+    def _move_selected_down(self) -> None:
+        row = self._list.currentRow()
+        if row < 0 or row >= len(self._catalog) - 1:
+            return
+        self._catalog[row], self._catalog[row + 1] = self._catalog[row + 1], self._catalog[row]
+        self._refresh_list()
+        self._list.setCurrentRow(row + 1)
+
+    def _rebuild_visible_ids_from_catalog_order(self) -> None:
+        visible_set = set(self._visible_ids)
+        self._visible_ids = [snippet.snippet_id for snippet in self._catalog if snippet.snippet_id in visible_set]
 
     def _build_custom_snippet_id(self, name: str) -> str:
         existing_ids = {snippet.snippet_id for snippet in self._catalog}

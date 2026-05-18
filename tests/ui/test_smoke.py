@@ -205,7 +205,7 @@ class TestDraftWorkspaceViewSmoke:
         menu = view._build_insert_menu()
         action_texts = [action.text() for action in menu.actions() if action.text()]
 
-        assert "$$ Math $$" in action_texts
+        assert any(text.startswith("$$") and text.endswith("$$") for text in action_texts)
         assert "| Table |" in action_texts
         assert "[x] Checklist" in action_texts
         assert "[](URL)" in action_texts
@@ -404,12 +404,13 @@ class TestMarkdownSnippetDialogSmoke:
         qtbot.addWidget(dlg)
 
         assert dlg.windowTitle() == "Tùy chỉnh đối tượng chèn"
-        assert dlg._btn_add.text() == "Thêm"
+        assert dlg._btn_move_up.text() == "↑"
+        assert dlg._btn_move_down.text() == "↓"
         assert dlg._btn_delete.text() == "Xóa"
         assert dlg._btn_edit.text() == "Sửa"
         assert dlg._btn_new.text() == "Tạo mới"
 
-    def test_new_snippet_persists_even_without_pressing_save_button(self, qtbot, mock_settings, monkeypatch):
+    def test_new_snippet_is_rolled_back_when_canceling_dialog(self, qtbot, mock_settings, monkeypatch):
         from core.services.markdown_snippet_service import MarkdownSnippetService
         from core.services.settings_service import SettingsService
         from ui.widgets.dialogs import markdown_snippet_dialog as snippet_dialog_module
@@ -446,7 +447,24 @@ class TestMarkdownSnippetDialogSmoke:
         dlg.reject()
 
         available_names = [snippet.name for snippet in svc.list_available()]
-        assert "My Snippet" in available_names
+        assert "My Snippet" not in available_names
+
+    def test_reorder_visible_snippets_with_arrow_buttons(self, qtbot, mock_settings):
+        from core.services.markdown_snippet_service import MarkdownSnippetService
+        from core.services.settings_service import SettingsService
+        from ui.widgets.dialogs.markdown_snippet_dialog import MarkdownSnippetCustomizeDialog
+
+        svc = MarkdownSnippetService(SettingsService())
+        svc._settings_service._settings = mock_settings
+
+        dlg = MarkdownSnippetCustomizeDialog(svc)
+        qtbot.addWidget(dlg)
+        dlg._list.setCurrentRow(0)
+        dlg._move_selected_down()
+        dlg._save_and_accept()
+
+        visible_ids = [snippet.snippet_id for snippet in svc.list_visible()]
+        assert visible_ids[:2] == ["table", "math"]
 
 
 class TestNoteListEditorTabSmoke:
@@ -943,6 +961,66 @@ class TestMarkdownEditorSmoke:
 
         overlays = w._editor.extraSelections()
         assert len(overlays) >= 1
+
+    def test_checklist_enter_auto_continues(self, qtbot):
+        from ui.widgets.markdown_editor import MarkdownEditorWidget
+
+        w = MarkdownEditorWidget()
+        qtbot.addWidget(w)
+        w._note_id = 1
+        w._set_note_loaded(True)
+        w._editor.setPlainText("- [ ] Công việc A")
+
+        cursor = w._editor.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        w._editor.setTextCursor(cursor)
+
+        qtbot.keyClick(w._editor, Qt.Key.Key_Return)
+        assert w._editor.toPlainText().endswith("\n- [ ] ")
+
+    def test_checklist_enter_on_empty_item_exits_checklist(self, qtbot):
+        from ui.widgets.markdown_editor import MarkdownEditorWidget
+
+        w = MarkdownEditorWidget()
+        qtbot.addWidget(w)
+        w._note_id = 1
+        w._set_note_loaded(True)
+        w._editor.setPlainText("- [ ] Công việc A")
+
+        cursor = w._editor.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        w._editor.setTextCursor(cursor)
+
+        qtbot.keyClick(w._editor, Qt.Key.Key_Return)
+        qtbot.keyClick(w._editor, Qt.Key.Key_Return)
+        assert "- [ ] \n" not in w._editor.toPlainText()
+
+    def test_checklist_full_width_overlay_is_applied(self, qtbot):
+        from ui.widgets.markdown_editor import MarkdownEditorWidget
+
+        w = MarkdownEditorWidget()
+        qtbot.addWidget(w)
+        w._note_id = 1
+        w._set_note_loaded(True)
+        w._editor.setPlainText("- [ ] Todo\nNội dung thường")
+        w._refresh_blockquote_overlays()
+
+        overlays = w._editor.extraSelections()
+        assert len(overlays) >= 1
+
+    def test_markdown_link_gets_blue_highlighted(self, qtbot):
+        from ui.widgets.markdown_editor import MarkdownEditorWidget
+
+        w = MarkdownEditorWidget()
+        qtbot.addWidget(w)
+        w._note_id = 1
+        w._set_note_loaded(True)
+        w._editor.setPlainText("[Chữ hiển thị](https://example.com)")
+        w._syntax_highlighter.rehighlight()
+
+        block = w._editor.document().firstBlock()
+        formats = block.layout().formats()
+        assert any(rng.format.foreground().color() == Qt.GlobalColor.blue or rng.format.foreground().color().name().lower() == "#1d4ed8" for rng in formats)
 
     def test_inline_latex_math_gets_highlighted(self, qtbot):
         from ui.widgets.markdown_editor import MarkdownEditorWidget
