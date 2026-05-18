@@ -12,21 +12,14 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QHBoxLayout,
     QMessageBox,
     QSplitter,
     QTabWidget,
-    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
-from ui.widgets.pdf_viewer import (
-    PDFViewerWidget,
-    SELECTION_IMAGE,
-    SELECTION_TABLE,
-    SELECTION_TEXT,
-)
+from ui.widgets.pdf_viewer import PDFViewerWidget
 from ui.widgets.markdown_editor import MarkdownEditorWidget
 from core.services.workspace_orchestrator import WorkspaceOrchestrator
 from core.utils.logger import get_logger
@@ -88,44 +81,6 @@ class DualPaneHost(QWidget):
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 1)
         layout.addWidget(splitter, stretch=1)
-        layout.addWidget(self._build_extraction_toolbar())
-
-    def _build_extraction_toolbar(self) -> QWidget:
-        bar = QWidget()
-        bar.setObjectName("extraction_toolbar")
-        lay = QHBoxLayout(bar)
-        lay.setContentsMargins(8, 4, 8, 4)
-        lay.setSpacing(6)
-
-        lay.addStretch()
-
-        self._btn_text = QToolButton()
-        self._btn_text.setText("Trích văn bản")
-        self._btn_text.setToolTip(
-            "Kéo chọn vùng văn bản trên PDF để trích xuất (kéo chuột)"
-        )
-        self._btn_text.setCheckable(True)
-        self._btn_text.clicked.connect(lambda: self._activate_mode(SELECTION_TEXT))
-        lay.addWidget(self._btn_text)
-
-        self._btn_table = QToolButton()
-        self._btn_table.setText("Trích bảng")
-        self._btn_table.setToolTip(
-            "Kéo chọn vùng chứa bảng để trích xuất và xem trước"
-        )
-        self._btn_table.setCheckable(True)
-        self._btn_table.clicked.connect(lambda: self._activate_mode(SELECTION_TABLE))
-        lay.addWidget(self._btn_table)
-
-        self._btn_image = QToolButton()
-        self._btn_image.setText("Chụp ảnh")
-        self._btn_image.setToolTip("Kéo chọn vùng để chụp ảnh lưu vào assets")
-        self._btn_image.setCheckable(True)
-        self._btn_image.clicked.connect(lambda: self._activate_mode(SELECTION_IMAGE))
-        lay.addWidget(self._btn_image)
-
-        self._mode_btns = [self._btn_text, self._btn_table, self._btn_image]
-        return bar
 
     # ------------------------------------------------------------------
     # Public API
@@ -153,15 +108,6 @@ class DualPaneHost(QWidget):
         pdf_viewer.open_document(Path(source.file_path), start_page)
 
         # Kết nối signals — ghi rõ source_id để handler biết tab nào gửi
-        pdf_viewer.text_region_selected.connect(
-            lambda pg, rect, sid=source_id: self._on_text_selected(sid, pg, rect)
-        )
-        pdf_viewer.table_region_selected.connect(
-            lambda pg, rect, sid=source_id: self._on_table_selected(sid, pg, rect)
-        )
-        pdf_viewer.image_region_selected.connect(
-            lambda pg, rect, sid=source_id: self._on_image_selected(sid, pg, rect)
-        )
         pdf_viewer.page_changed.connect(
             lambda pg, sid=source_id: self._on_page_changed_for(sid, pg)
         )
@@ -266,153 +212,3 @@ class DualPaneHost(QWidget):
         """Lưu trang đang xem vào DB cho source cụ thể."""
         self._orchestrator.update_last_opened_page(source_id, page_no)
 
-    # ------------------------------------------------------------------
-    # Extraction mode
-    # ------------------------------------------------------------------
-
-    def _activate_mode(self, mode: int) -> None:
-        """Bật một chế độ chọn vùng, tắt các chế độ khác."""
-        from ui.widgets.pdf_viewer import SELECTION_NONE
-        viewer = self._pdf_viewer
-        if viewer is None:
-            return
-        current_btn = {
-            SELECTION_TEXT: self._btn_text,
-            SELECTION_TABLE: self._btn_table,
-            SELECTION_IMAGE: self._btn_image,
-        }.get(mode)
-        is_activating = current_btn is not None and current_btn.isChecked()
-        for btn in self._mode_btns:
-            btn.setChecked(False)
-        if is_activating:
-            current_btn.setChecked(True)  # type: ignore[union-attr]
-            viewer.set_selection_mode(mode)
-        else:
-            viewer.set_selection_mode(SELECTION_NONE)
-
-    # ------------------------------------------------------------------
-    # Extraction handlers
-    # ------------------------------------------------------------------
-
-    def _on_text_selected(self, source_id: int, page_no: int, pdf_rect: tuple) -> None:
-        """Trích văn bản từ vùng đã chọn → chèn vào editor."""
-        if source_id not in self._source_ids:
-            return
-        idx = self._source_ids.index(source_id)
-        viewer = self._pdf_viewers[idx]
-        note_id = self._note_ids[idx]
-        if not viewer.file_path or note_id is None:
-            return
-
-        from core.extraction.pdf_text import extract_region_text
-        doc = viewer._doc  # truy cập nội bộ (đồng thread)
-        if doc is None:
-            return
-
-        raw = extract_region_text(doc, page_no, pdf_rect)
-        if not raw.strip():
-            QMessageBox.information(self, "Thông tin", "Vùng đã chọn không có văn bản.")
-            return
-
-        text, anchor = self._orchestrator.prepare_text_extract(source_id, page_no, pdf_rect, raw)
-        sc = self._source_codes[idx] if idx < len(self._source_codes) else None
-        extract_id = self._orchestrator.commit_extract(
-            source_id=source_id,
-            page_no=page_no,
-            extract_type="text",
-            source_anchor=anchor,
-            content_md=text,
-            note_id=note_id,
-        )
-
-        self._md_editor.insert_extract(
-            text, anchor,
-            source_code=sc,
-            page_no=page_no,
-            extract_id=extract_id,
-            rect=pdf_rect,
-        )
-        for btn in self._mode_btns:
-            btn.setChecked(False)
-
-    def _on_table_selected(self, source_id: int, page_no: int, pdf_rect: tuple) -> None:
-        """Trích bảng: hiển thị preview trước khi commit."""
-        if source_id not in self._source_ids:
-            return
-        idx = self._source_ids.index(source_id)
-        viewer = self._pdf_viewers[idx]
-        note_id = self._note_ids[idx]
-        if not viewer.file_path or note_id is None:
-            return
-
-        from core.extraction.pdf_table import extract_table_from_region
-        from core.extraction.normalizers import table_to_markdown
-        from ui.widgets.dialogs.table_preview_dialog import TablePreviewDialog
-
-        rows = extract_table_from_region(viewer.file_path, page_no, pdf_rect)
-        if not rows:
-            QMessageBox.information(self, "Thông tin", "Không phát hiện bảng trong vùng đã chọn.")
-            for btn in self._mode_btns:
-                btn.setChecked(False)
-            return
-
-        table_md = table_to_markdown(rows)
-        anchor = self._orchestrator.build_anchor(source_id, page_no, pdf_rect)
-        sc = self._source_codes[idx] if idx < len(self._source_codes) else None
-
-        dlg = TablePreviewDialog(table_md, anchor, self)
-        if dlg.exec():
-            extract_id = self._orchestrator.commit_extract(
-                source_id=source_id,
-                page_no=page_no,
-                extract_type="table",
-                source_anchor=anchor,
-                content_md=table_md,
-                note_id=note_id,
-            )
-            self._md_editor.insert_table(
-                table_md, anchor,
-                source_code=sc,
-                page_no=page_no,
-                extract_id=extract_id,
-                rect=pdf_rect,
-            )
-
-        for btn in self._mode_btns:
-            btn.setChecked(False)
-
-    def _on_image_selected(self, source_id: int, page_no: int, pdf_rect: tuple) -> None:
-        """Chụp ảnh vùng → lưu asset → chèn tham chiếu vào editor."""
-        if source_id not in self._source_ids:
-            return
-        idx = self._source_ids.index(source_id)
-        viewer = self._pdf_viewers[idx]
-        note_id = self._note_ids[idx]
-        if not viewer.file_path or note_id is None:
-            return
-
-        from core.extraction.pdf_image import capture_region
-        doc = viewer._doc
-        if doc is None:
-            return
-
-        try:
-            img_bytes = capture_region(doc, page_no, pdf_rect)
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Lỗi", f"Không thể chụp ảnh:\n{exc}")
-            for btn in self._mode_btns:
-                btn.setChecked(False)
-            return
-
-        try:
-            asset_path = self._orchestrator.save_image_asset(source_id, note_id, img_bytes)
-            self._md_editor.insert_asset_ref(asset_path, "")
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                f"Không thể lưu asset ảnh source={source_id} note={note_id} "
-                f"page={page_no}: {exc}"
-            )
-            QMessageBox.critical(self, "Lỗi", f"Không thể lưu ảnh:\n{exc}")
-
-        for btn in self._mode_btns:
-            btn.setChecked(False)

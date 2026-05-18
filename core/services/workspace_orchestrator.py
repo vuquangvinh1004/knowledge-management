@@ -144,7 +144,7 @@ class WorkspaceOrchestrator:
         extract_type: str,
         source_anchor: str,
         content_md: str,
-        note_id: int,
+        note_id: int | None,
     ) -> int | None:
         """Commit extract và trả về extract id nếu thành công."""
         try:
@@ -164,7 +164,7 @@ class WorkspaceOrchestrator:
             )
             return None
 
-    def save_image_asset(self, source_id: int, note_id: int, image_bytes: bytes) -> str:
+    def save_image_asset(self, source_id: int, note_id: int | None, image_bytes: bytes) -> str:
         """Lưu asset ảnh và trả về file path."""
         asset = AssetService(self._assets_dir).save_image_asset(
             source_id=source_id,

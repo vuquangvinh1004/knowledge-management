@@ -686,4 +686,8 @@ CHANGED | GitHub Copilot (GPT-5.3-Codex) | WORKSPACE_READING_SPACE | Tối ưu k
 
 ADDED | GitHub Copilot (GPT-5.3-Codex) | TESTS_UI | Thêm regression smoke test cho read-focus mode (`DraftWorkspaceView`) để đảm bảo bật chế độ đọc tập trung sẽ ẩn toolbar PDF đúng hành vi.
 
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | WORKSPACE_EXTRACTION | Dời 3 thao tác `Trích văn bản` / `Trích bảng` / `Chụp ảnh` từ `GC Nguồn` sang `Không gian làm việc`; extraction giờ gắn với PDF tham khảo + scratch markdown editor, còn `GC Nguồn` bỏ toolbar trích xuất để tránh dư thừa chức năng.
+
+ADDED | GitHub Copilot (GPT-5.3-Codex) | TESTS_UI | Thêm smoke tests xác nhận các nút trích xuất của workspace chỉ bật khi đã mở tài liệu tham khảo và `DualPaneHost` không còn hiển thị `extraction_toolbar`.
+
 TEST STATUS | `python -m pytest tests/ui/test_smoke.py -q` | 54/54 passed.

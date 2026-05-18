@@ -1230,6 +1230,10 @@ CHANGED | GitHub Copilot (GPT-5.3-Codex) | UI_WORKSPACE_UX | Tối ưu không gi
 
 ADDED | GitHub Copilot (GPT-5.3-Codex) | TESTS_UI | Bổ sung smoke test cho chế độ `Tập trung đọc` xác nhận toolbar điều hướng PDF được ẩn khi bật chế độ đọc tập trung.
 
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | UI_WORKFLOW | Chuyển các thao tác `Trích văn bản`, `Trích bảng`, `Chụp ảnh` khỏi `GC Nguồn` sang header của `Không gian làm việc`; workflow mới cho phép trích xuất trực tiếp từ PDF tham khảo và chèn vào scratch markdown editor, trong khi `GC Nguồn` chỉ còn vai trò source note workspace để tránh trùng chức năng.
+
+ADDED | GitHub Copilot (GPT-5.3-Codex) | TESTS_UI | Thêm smoke tests xác nhận các nút trích xuất chỉ enable khi workspace đã mở PDF tham khảo và `DualPaneHost` không còn dựng `extraction_toolbar` trong `GC Nguồn`.
+
 ### 2026-04-22
 
 ADDED | OpenAI GPT-5.4 Thinking | INITIAL | Khởi tạo tài liệu kiến trúc chuẩn cho Ứng dụng Desktop Quản lý Kiến thức Cá nhân phục vụ nghiên cứu. Xác lập tech stack, cấu trúc thư mục, ranh giới shell-service-extraction-search-persistence, business rules, database policy, UI rules, testing requirements, migration rules và checklist bắt buộc cho AI Agent.
