@@ -187,10 +187,40 @@ class TestDraftWorkspaceViewSmoke:
         assert view._btn_extract_text.property("workspaceRole") == "extract-action"
         assert view._btn_extract_table.property("workspaceRole") == "extract-action"
         assert view._btn_capture_image.property("workspaceRole") == "extract-action"
+        assert view._btn_read_focus.property("workspaceRole") == "extract-action"
+        assert view._btn_insert_snippet.property("workspaceRole") == "insert-action"
 
         assert view._btn_extract_text.x() < view._btn_new_md.x()
         assert view._btn_extract_table.x() < view._btn_new_md.x()
         assert view._btn_capture_image.x() < view._btn_new_md.x()
+        assert view._btn_read_focus.x() < view._btn_new_md.x()
+        assert view._btn_insert_snippet.x() > view._btn_toggle_right.x()
+
+    def test_insert_menu_has_defaults_and_customize_action(self, qtbot):
+        from ui.views.draft_workspace_view import DraftWorkspaceView
+
+        view = DraftWorkspaceView()
+        qtbot.addWidget(view)
+
+        menu = view._build_insert_menu()
+        action_texts = [action.text() for action in menu.actions() if action.text()]
+
+        assert "$$ Math $$" in action_texts
+        assert "| Table |" in action_texts
+        assert "[x] Checklist" in action_texts
+        assert "[](URL)" in action_texts
+        assert "Tùy chỉnh..." in action_texts
+
+    def test_insert_snippet_adds_template_to_editor(self, qtbot):
+        from ui.views.draft_workspace_view import DraftWorkspaceView
+
+        view = DraftWorkspaceView()
+        qtbot.addWidget(view)
+
+        view._insert_snippet("math")
+
+        content = view._draft_editor.get_content()
+        assert "Biểu thức toán #(Eq.01)" in content
 
     def test_draft_workspace_does_not_auto_create_ban_nhap_note(self, qtbot, db_session):
         from core.storage.models import Note
@@ -359,6 +389,25 @@ class TestDraftWorkspaceViewSmoke:
         assert view._pdf_viewers[0]._nav_bar.isVisible()
         view._toggle_read_focus_mode()
         assert not view._pdf_viewers[0]._nav_bar.isVisible()
+
+
+class TestMarkdownSnippetDialogSmoke:
+    def test_customize_dialog_creates_with_expected_buttons(self, qtbot, mock_settings):
+        from core.services.markdown_snippet_service import MarkdownSnippetService
+        from core.services.settings_service import SettingsService
+        from ui.widgets.dialogs.markdown_snippet_dialog import MarkdownSnippetCustomizeDialog
+
+        svc = MarkdownSnippetService(SettingsService())
+        svc._settings_service._settings = mock_settings
+
+        dlg = MarkdownSnippetCustomizeDialog(svc)
+        qtbot.addWidget(dlg)
+
+        assert dlg.windowTitle() == "Tùy chỉnh đối tượng chèn"
+        assert dlg._btn_add.text() == "Thêm"
+        assert dlg._btn_delete.text() == "Xóa"
+        assert dlg._btn_edit.text() == "Sửa"
+        assert dlg._btn_new.text() == "Tạo mới"
 
 
 class TestNoteListEditorTabSmoke:

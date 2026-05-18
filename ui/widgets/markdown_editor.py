@@ -611,6 +611,14 @@ class MarkdownEditorWidget(QWidget):
         ref = f"\n![{caption}]({asset_path})\n\n"
         self._insert_at_cursor(ref)
 
+    def insert_snippet(self, snippet_text: str) -> None:
+        """Chèn snippet Markdown vào đúng vị trí con trỏ hiện tại."""
+        cursor = self._editor.textCursor()
+        cursor.insertText(snippet_text)
+        self._editor.setTextCursor(cursor)
+        self._editor.setFocus()
+        self._editor.ensureCursorVisible()
+
     # ------------------------------------------------------------------
     # Save
     # ------------------------------------------------------------------

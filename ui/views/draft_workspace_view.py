@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMessageBox,
+    QMenu,
     QPushButton,
     QSplitter,
     QTabWidget,
@@ -17,6 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.services.markdown_snippet_service import MarkdownSnippetService
 from core.services.source_service import SourceService
 from core.services.workspace_orchestrator import WorkspaceOrchestrator
 from ui.widgets.markdown_editor import MarkdownEditorWidget
@@ -40,6 +42,7 @@ class DraftWorkspaceView(QWidget):
         from config.paths import ASSETS_DIR, NOTES_DIR
 
         self._orchestrator = WorkspaceOrchestrator(NOTES_DIR, ASSETS_DIR)
+        self._snippet_service = MarkdownSnippetService()
         self._project_id: int | None = None
         self._source_ids: list[int] = []
         self._source_codes: list[str | None] = []
@@ -97,6 +100,12 @@ class DraftWorkspaceView(QWidget):
         self._btn_capture_image.clicked.connect(lambda: self._activate_extraction_mode(SELECTION_IMAGE))
         header_lay.addWidget(self._btn_capture_image)
 
+        self._btn_read_focus = QPushButton("Tập trung đọc")
+        self._btn_read_focus.setToolTip("Ẩn/hiện thanh điều hướng PDF để tăng không gian đọc")
+        self._btn_read_focus.setProperty("workspaceRole", "extract-action")
+        self._btn_read_focus.clicked.connect(self._toggle_read_focus_mode)
+        header_lay.addWidget(self._btn_read_focus)
+
         self._lbl_scratch_status = QLabel("")
         self._lbl_scratch_status.setObjectName("editor_save_status")
         header_lay.addStretch()
@@ -116,15 +125,16 @@ class DraftWorkspaceView(QWidget):
         self._btn_close_all_refs.clicked.connect(self._close_all_reference_tabs)
         header_lay.addWidget(self._btn_close_all_refs)
 
-        self._btn_read_focus = QPushButton("Tập trung đọc")
-        self._btn_read_focus.setToolTip("Ẩn/hiện thanh điều hướng PDF để tăng không gian đọc")
-        self._btn_read_focus.clicked.connect(self._toggle_read_focus_mode)
-        header_lay.addWidget(self._btn_read_focus)
-
         self._btn_toggle_right = QPushButton("Soạn thảo")
         self._btn_toggle_right.setToolTip("Ẩn/hiện panel soạn thảo")
         self._btn_toggle_right.clicked.connect(self._toggle_editor_panel)
         header_lay.addWidget(self._btn_toggle_right)
+
+        self._btn_insert_snippet = QPushButton("Chèn...")
+        self._btn_insert_snippet.setToolTip("Chèn nhanh đối tượng Markdown vào vùng soạn thảo")
+        self._btn_insert_snippet.setProperty("workspaceRole", "insert-action")
+        self._btn_insert_snippet.clicked.connect(self._open_insert_menu)
+        header_lay.addWidget(self._btn_insert_snippet)
 
         layout.addWidget(header)
 
@@ -618,3 +628,35 @@ class DraftWorkspaceView(QWidget):
         if self._scratch_file_path is None:
             return "Soạn thảo tạm thời (chưa lưu)"
         return f"Soạn thảo: {self._scratch_file_path.name}"
+
+    def _build_insert_menu(self) -> QMenu:
+        menu = QMenu(self)
+        for snippet in self._snippet_service.list_visible():
+            action = menu.addAction(snippet.name)
+            action.triggered.connect(
+                lambda _checked=False, snippet_id=snippet.snippet_id: self._insert_snippet(snippet_id)
+            )
+        menu.addSeparator()
+        customize_action = menu.addAction("Tùy chỉnh...")
+        customize_action.triggered.connect(self._open_snippet_customize_dialog)
+        return menu
+
+    def _open_insert_menu(self) -> None:
+        menu = self._build_insert_menu()
+        menu.exec(self._btn_insert_snippet.mapToGlobal(self._btn_insert_snippet.rect().bottomLeft()))
+
+    def _insert_snippet(self, snippet_id: str) -> None:
+        snippet = self._snippet_service.get_by_id(snippet_id)
+        if snippet is None:
+            return
+        if not self._right_panel.isVisible():
+            self._right_panel.setVisible(True)
+            self._normalize_splitter_sizes()
+            self._update_panel_toggle_labels()
+        self._draft_editor.insert_snippet(snippet.template)
+
+    def _open_snippet_customize_dialog(self) -> None:
+        from ui.widgets.dialogs.markdown_snippet_dialog import MarkdownSnippetCustomizeDialog
+
+        dlg = MarkdownSnippetCustomizeDialog(self._snippet_service, self)
+        dlg.exec()

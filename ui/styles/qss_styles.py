@@ -225,6 +225,30 @@ QPushButton[workspaceRole="extract-action"]:disabled {
     border-color: #D9C9FB;
 }
 
+QPushButton[workspaceRole="insert-action"] {
+    background-color: #1F9D55;
+    color: #FFFFFF;
+    border: 1px solid #187A42;
+    font-weight: 600;
+}
+
+QPushButton[workspaceRole="insert-action"]:hover {
+    background-color: #18864A;
+    border-color: #136B3A;
+}
+
+QPushButton[workspaceRole="insert-action"]:pressed {
+    background-color: #136B3A;
+    border-color: #0F5A31;
+    color: #FFFFFF;
+}
+
+QPushButton[workspaceRole="insert-action"]:disabled {
+    background-color: #DBF3E5;
+    color: #6B8E79;
+    border-color: #B7E3C8;
+}
+
 /* === Toolbar === */
 QToolBar {
     background-color: #FFFFFF;
