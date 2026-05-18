@@ -1182,6 +1182,54 @@ Quy tắc ghi chú:
 2. Categories: ADDED, CHANGED, FIXED, REMOVED, DEPRECATED
 3. Nếu có thay đổi schema, phải ghi thêm dòng “Migration Notes”
 
+### 2026-05-18
+
+CHANGED | GitHub Copilot (GPT-5.4 mini) | UI_SHELL | Tách lại vai trò điều hướng chính: bỏ toolbar rỗng ở main window, đổi luồng mở source sang tab GC Nguồn trong Quản lý ghi chú, và dựng Không gian làm việc nháp độc lập với source note.
+
+CHANGED | GitHub Copilot (GPT-5.4 mini) | UI_VIEWS | `NoteManagementView` của MainWindow chuyển sang container tab 3 lớp: `GC Nguồn`, `GH Khái niệm`, `GH Tổng hợp`; hai tab sau dùng workbench theo `note_type` để edit note cục bộ.
+
+CHANGED | GitHub Copilot (GPT-5.4 mini) | UI_LABELS | Đổi nhãn hành động mở source trong Library/Source detail sang `Ghi chú nguồn` để khớp semantics mới.
+
+CHANGED | GitHub Copilot (GPT-5.4 mini) | UI_LAYOUT | Tối giản tab `GC Nguồn`: ẩn nhóm nút note actions trong editor (`Note mới`, `Metadata`, `Wikilinks`, `Tags`) và dời thanh `Trích văn bản / Trích bảng / Chụp ảnh` xuống dưới vùng làm việc để tăng không gian hiển thị tài liệu.
+
+CHANGED | GitHub Copilot (GPT-5.4 mini) | UI_LAYOUT | Refactor `GC Khái niệm` và `GC Tổng hợp` sang layout single-editor: bỏ splitter hai cửa sổ, dùng document tabs để chuyển nhanh giữa ghi chú cùng loại, giữ template ở ngay nội dung note khi tạo mới.
+
+FIXED | GitHub Copilot (GPT-5.4 mini) | UI_BUG | Khắc phục lỗi mở ứng dụng bị bật dialog standalone (`Mở Board note`) ngoài ý muốn do signal mở note không source phát từ tab quản lý ghi chú ngay lúc khởi tạo.
+
+CHANGED | GitHub Copilot (GPT-5.4 mini) | UI_WORKFLOW | `GC Khái niệm`/`GC Tổng hợp` bỏ nút `Tạo note mới`, chuyển sang action tab `Tạo note mới`; tạo note theo quick-create và nạp template trực tiếp vào editor chính.
+
+CHANGED | GitHub Copilot (GPT-5.4 mini) | UI_VISUAL | Tab phân vùng ghi chú dùng màu nền phân biệt: `GC Nguồn` (đỏ), `GC Khái niệm` (xanh lá), `GC Tổng hợp` (xanh dương).
+
+CHANGED | GitHub Copilot (Claude Haiku 4.5) | UI_LAYOUT | Tối ưu giao diện tab `GC Khái niệm` và `GC Tổng hợp`: bỏ header text dòng trên để tiết kiệm không gian, giữ 1 tab "Tạo note mới" duy nhất (bỏ tab "Bản nháp"), tab con "Tạo note mới" kế thừa màu sắc từ tab cha (xanh lá/xanh dương). Refactor `NoteListEditorTab.__init__()` bỏ title parameter, thêm `_setup_doc_tabs_style()` để áp dụng style theo loại note. Validation: 12/12 smoke tests pass, không có regression.
+
+FIXED | GitHub Copilot (GPT-5.3-Codex) | UI_VISUAL | Sửa hiển thị màu 3 tab chính `GC Nguồn`/`GC Khái niệm`/`GC Tổng hợp` bằng custom `NoteScopeTabBar` để đảm bảo màu đúng theo scope (đỏ/xanh lá/xanh dương), không phụ thuộc selector stylesheet theo thứ tự tab.
+
+FIXED | GitHub Copilot (GPT-5.3-Codex) | UI_NAVIGATION | Nút `Vào Thư viện` trong empty state của tab `GC Nguồn` đã được nối signal điều hướng về màn `Thư viện nguồn` thay vì không có phản hồi.
+
+FIXED | GitHub Copilot (GPT-5.3-Codex) | UI_WORKFLOW | Tab `Tạo note mới` trong `GC Tổng hợp` hoạt động cả khi là tab duy nhất: thêm xử lý click lặp trên tab đang chọn để mở dialog quick-create, từ đó mở khóa đúng luồng tạo note và thao tác `Xóa note`/`Xóa cứng` sau khi note được tạo.
+
+ADDED | GitHub Copilot (GPT-5.3-Codex) | TESTS_UI | Bổ sung regression tests cho điều hướng từ `GC Nguồn` sang `Thư viện nguồn` và cho quick-create của `GC Tổng hợp` khi chưa có note. Validation: 14/14 smoke+regression tests pass.
+
+FIXED | GitHub Copilot (GPT-5.3-Codex) | UI_WORKFLOW | Gỡ bỏ hoàn toàn cơ chế tự tạo note `Bản nháp` khi khởi động `DraftWorkspaceView` để không còn phát sinh tab `Bản nháp` tự động trong `GC Khái niệm` sau mỗi lần mở ứng dụng.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | UI_VISUAL | Tinh chỉnh tab con trong các tab chính: giảm chiều cao còn khoảng 70% so với trước, giữ nguyên hệ màu theo scope và giảm độ sáng 8-12% để giao diện dịu màu hơn nhưng vẫn nhận diện rõ.
+
+ADDED | GitHub Copilot (GPT-5.3-Codex) | TESTS_UI | Thêm regression test xác nhận `DraftWorkspaceView` không tự tạo note `Bản nháp` khi khởi tạo. Validation: 14/14 smoke tests pass.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | UI_WORKSPACE | `DraftWorkspaceView` được nâng cấp thành workspace 2 khung độc lập: trái là PDF viewer dạng tab (mở nhiều tài liệu tham khảo cùng lúc), phải là editor Markdown scratch-mode không gắn `note_id` DB.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | UI_LIBRARY_WORKFLOW | `SourceDetailPanel` và `LibraryView` bổ sung action `Mở tài liệu` để điều hướng trực tiếp sang workspace tham khảo (PDF tabbed), tách biệt với luồng `Ghi chú nguồn` trong Quản lý ghi chú.
+
+FIXED | GitHub Copilot (GPT-5.3-Codex) | NOTE_DELETE | Sửa luồng phân tích ảnh hưởng trước xóa cứng: `get_note_delete_impact()` cho phép phân tích cả note đã soft-delete để người dùng có thể xóa cứng note đã xóa mà không gặp lỗi "Không tìm thấy note id=...".
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | UI_WORKSPACE_UX | Tối ưu header `Không gian làm việc`: bỏ tiêu đề chữ dư thừa, thêm trạng thái file scratch (`<tên file>.md • Đã lưu/Chưa lưu*`) và thêm nút `Đóng tất cả` cho panel PDF tabbed để giảm thao tác dọn phiên làm việc.
+
+ADDED | GitHub Copilot (GPT-5.3-Codex) | TESTS_UI | Bổ sung smoke tests cho UX mới của workspace (không còn tiêu đề trên cùng, có status label, đóng tất cả tab PDF) và test MainWindow `closeEvent` chặn đóng ứng dụng khi workspace từ chối xác nhận lưu.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | UI_WORKSPACE_UX | Tối ưu không gian đọc panel trái của `DraftWorkspaceView`: toolbar PDF chuyển sang compact mode, tab tài liệu tham khảo dùng style compact riêng (`workspace_ref_tabs`), và thêm chế độ `Tập trung đọc` để ẩn/hiện thanh điều hướng PDF theo nhu cầu đọc.
+
+ADDED | GitHub Copilot (GPT-5.3-Codex) | TESTS_UI | Bổ sung smoke test cho chế độ `Tập trung đọc` xác nhận toolbar điều hướng PDF được ẩn khi bật chế độ đọc tập trung.
+
 ### 2026-04-22
 
 ADDED | OpenAI GPT-5.4 Thinking | INITIAL | Khởi tạo tài liệu kiến trúc chuẩn cho Ứng dụng Desktop Quản lý Kiến thức Cá nhân phục vụ nghiên cứu. Xác lập tech stack, cấu trúc thư mục, ranh giới shell-service-extraction-search-persistence, business rules, database policy, UI rules, testing requirements, migration rules và checklist bắt buộc cho AI Agent.

@@ -256,6 +256,14 @@ class TestNoteMaintenance:
         assert impact["incoming_links"] >= 1
         assert impact["extract_refs"] >= 1
 
+    def test_get_note_delete_impact_supports_soft_deleted_note(self, service, db_session):
+        note = service.create_note("Temp delete impact", "concept_note")
+        service.soft_delete(note.id)
+
+        impact = service.get_note_delete_impact(note.id)
+        assert impact["note_id"] == note.id
+        assert impact["note_type"] == "concept_note"
+
 
 # ---------------------------------------------------------------------------
 # Project scope (Sprint 7B)

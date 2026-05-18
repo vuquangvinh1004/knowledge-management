@@ -34,10 +34,12 @@ class LibraryView(QWidget):
 
     Signals:
         open_source_requested(int): Khi người dùng muốn mở source.
+        open_reference_requested(int): Khi người dùng muốn mở PDF tham khảo trong Workspace.
         import_requested: Khi nhấn nút Nhập nguồn.
     """
 
     open_source_requested = Signal(int)
+    open_reference_requested = Signal(int)
     import_requested = Signal()
 
     def __init__(self, parent=None) -> None:
@@ -109,6 +111,7 @@ class LibraryView(QWidget):
         # --- Phải: source detail panel ---
         self._detail_panel = SourceDetailPanel()
         self._detail_panel.open_requested.connect(self.open_source_requested)
+        self._detail_panel.open_reference_requested.connect(self.open_reference_requested)
         self._detail_panel.refresh_requested.connect(self._on_detail_refresh)
         splitter.addWidget(self._detail_panel)
 
@@ -227,7 +230,8 @@ class LibraryView(QWidget):
             return
         source_id = item.data(Qt.ItemDataRole.UserRole)
         menu = QMenu(self)
-        act_open = menu.addAction("📖  Mở tài liệu")
+        act_open = menu.addAction("📖  Ghi chú nguồn")
+        act_open_reference = menu.addAction("📄  Mở tài liệu")
         act_edit = menu.addAction("✏  Chỉnh sửa thông tin")
         act_delete = menu.addAction("❌  Xóa khỏi thư viện")
         menu.addSeparator()
@@ -236,6 +240,8 @@ class LibraryView(QWidget):
         chosen = menu.exec(self._list_widget.mapToGlobal(pos))
         if chosen == act_open:
             self.open_source_requested.emit(source_id)
+        elif chosen == act_open_reference:
+            self.open_reference_requested.emit(source_id)
         elif chosen == act_edit:
             self._detail_panel.load_source(source_id)
             self._detail_panel._on_edit()

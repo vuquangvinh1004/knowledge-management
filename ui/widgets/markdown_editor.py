@@ -280,6 +280,7 @@ class MarkdownEditorWidget(QWidget):
         self._known_tags: set[str] = set()
         self._known_wikilinks: list[tuple[str, str]] = []
         self._wikilink_display_to_title: dict[str, str] = {}
+        self._show_note_actions = True
         self._build_ui()
         self._setup_autosave()
         self._setup_shortcuts()
@@ -444,16 +445,31 @@ class MarkdownEditorWidget(QWidget):
         self._editor.blockSignals(False)
         self._is_modified = False
         self._lbl_save_status.setText("Đã lưu")
-        self._btn_tags.setEnabled(True)
-        self._btn_wikilinks.setEnabled(True)
-        self._btn_new_note.setEnabled(True)
-        self._btn_meta.setEnabled(True)
+        self._btn_tags.setEnabled(self._show_note_actions)
+        self._btn_wikilinks.setEnabled(self._show_note_actions)
+        self._btn_new_note.setEnabled(self._show_note_actions)
+        self._btn_meta.setEnabled(self._show_note_actions)
         self._set_note_loaded(True)
         self._refresh_known_tags()
         self._refresh_known_wikilinks()
         self._refresh_backlinks()
         self._refresh_quality_warning()
         self._refresh_blockquote_overlays()
+
+    def set_note_actions_visible(self, visible: bool) -> None:
+        """Hiện/ẩn nhóm nút thao tác note ở header editor."""
+        self._show_note_actions = visible
+        self._btn_tags.setVisible(visible)
+        self._btn_wikilinks.setVisible(visible)
+        self._btn_new_note.setVisible(visible)
+        self._btn_meta.setVisible(visible)
+        self._lbl_backlinks.setVisible(visible)
+        self._lbl_quality_warning.setVisible(visible)
+        if not visible:
+            self._btn_tags.setEnabled(False)
+            self._btn_wikilinks.setEnabled(False)
+            self._btn_new_note.setEnabled(False)
+            self._btn_meta.setEnabled(False)
 
     def unload_note(self) -> None:
         """Thoát khỏi note hiện tại (lưu trước nếu còn thay đổi)."""
@@ -482,6 +498,50 @@ class MarkdownEditorWidget(QWidget):
     def get_content(self) -> str:
         """Nội dung Markdown hiện tại trong editor."""
         return self._editor.toPlainText()
+
+    def enable_scratch_mode(self, title: str = "Soạn thảo tạm thời (Markdown)") -> None:
+        """Bật editor ở chế độ soạn thảo file tạm, không gắn note DB."""
+        from config.paths import NOTES_DIR
+
+        self._autosave_timer.stop()
+        self._note_id = None
+        self._current_note_type = None
+        self._current_source_id = None
+        self._notes_dir = NOTES_DIR
+        self.set_note_actions_visible(False)
+        self._set_note_loaded(True)
+        self._lbl_title.setText(title)
+        self._lbl_save_status.setText("")
+        self._lbl_backlinks.setText("")
+        self._lbl_quality_warning.setText("")
+        self._refresh_known_tags()
+        self._refresh_known_wikilinks()
+        self.mark_saved(show_saved_badge=False)
+
+    def set_markdown_content(self, content: str) -> None:
+        """Gán nội dung Markdown trực tiếp cho editor."""
+        self._editor.blockSignals(True)
+        self._editor.setPlainText(content)
+        self._editor.blockSignals(False)
+        self._refresh_blockquote_overlays()
+        self.mark_saved(show_saved_badge=False)
+
+    def set_editor_title(self, title: str) -> None:
+        """Đổi nhãn tiêu đề trên header của editor."""
+        self._lbl_title.setText(title)
+
+    def mark_saved(self, show_saved_badge: bool = True) -> None:
+        """Đánh dấu trạng thái editor đã lưu."""
+        self._is_modified = False
+        self._lbl_save_status.setText("Đã lưu" if show_saved_badge else "")
+
+    def set_save_status_text(self, text: str) -> None:
+        """Gán trạng thái lưu trên header editor."""
+        self._lbl_save_status.setText(text)
+
+    def has_unsaved_changes(self) -> bool:
+        """Cho biết editor có thay đổi chưa lưu hay không."""
+        return self._is_modified
 
     def insert_extract(
         self,
@@ -586,7 +646,8 @@ class MarkdownEditorWidget(QWidget):
         self._autosave_timer.start()
         QTimer.singleShot(0, self._update_hashtag_popup)
         QTimer.singleShot(0, self._update_wikilink_popup)
-        QTimer.singleShot(0, self._refresh_quality_warning)
+        if self._show_note_actions:
+            QTimer.singleShot(0, self._refresh_quality_warning)
         QTimer.singleShot(0, self._refresh_blockquote_overlays)
         self.content_changed.emit()
 
@@ -650,42 +711,50 @@ class MarkdownEditorWidget(QWidget):
 
     def _refresh_blockquote_overlays(self) -> None:
         """Tô nền full-width cho các dòng blockquote (giống shading theo hàng)."""
-        selections: list[QTextEdit.ExtraSelection] = []
-        block = self._editor.document().firstBlock()
-        while block.isValid():
-            text = block.text()
-            if _MarkdownSyntaxHighlighter._BLOCKQUOTE_PATTERN.match(text):
-                sel = QTextEdit.ExtraSelection()
-                sel.cursor = QTextCursor(block)
-                sel.cursor.clearSelection()
-                sel.format.setBackground(QColor("#F8EEDB"))
-                sel.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
-                selections.append(sel)
-            block = block.next()
+        try:
+            selections: list[QTextEdit.ExtraSelection] = []
+            block = self._editor.document().firstBlock()
+            while block.isValid():
+                text = block.text()
+                if _MarkdownSyntaxHighlighter._BLOCKQUOTE_PATTERN.match(text):
+                    sel = QTextEdit.ExtraSelection()
+                    sel.cursor = QTextCursor(block)
+                    sel.cursor.clearSelection()
+                    sel.format.setBackground(QColor("#F8EEDB"))
+                    sel.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
+                    selections.append(sel)
+                block = block.next()
 
-        self._editor.setExtraSelections(selections)
+            self._editor.setExtraSelections(selections)
+        except RuntimeError:
+            return
 
     def _refresh_quality_warning(self) -> None:
         """Hiển thị soft-warning chất lượng note hiện tại."""
-        if self._note_id is None or self._current_note_type is None:
-            self._lbl_quality_warning.setText("")
+        try:
+            if self._note_id is None or self._current_note_type is None:
+                self._lbl_quality_warning.setText("")
+                return
+
+            warnings = self._orchestrator.build_quality_warnings(
+                note_id=self._note_id,
+                note_type=self._current_note_type,
+                note_title=self._lbl_title.text(),
+                content=self._editor.toPlainText(),
+                current_source_id=self._current_source_id,
+            )
+
+            if warnings:
+                self._lbl_quality_warning.setText("Cảnh báo: " + " | ".join(warnings))
+            else:
+                self._lbl_quality_warning.setText("")
+        except RuntimeError:
             return
-
-        warnings = self._orchestrator.build_quality_warnings(
-            note_id=self._note_id,
-            note_type=self._current_note_type,
-            note_title=self._lbl_title.text(),
-            content=self._editor.toPlainText(),
-            current_source_id=self._current_source_id,
-        )
-
-        if warnings:
-            self._lbl_quality_warning.setText("Cảnh báo: " + " | ".join(warnings))
-        else:
-            self._lbl_quality_warning.setText("")
 
     def _open_new_note_dialog(self) -> None:
         """Mở NewNoteDialog để tạo concept/synthesis/board note."""
+        if not self._show_note_actions:
+            return
         if self._notes_dir is None or self._note_id is None:
             QMessageBox.information(self, "Tạo note", "Vui lòng mở một note trước khi tạo note mới.")
             return
@@ -732,6 +801,8 @@ class MarkdownEditorWidget(QWidget):
 
     def _open_metadata_dialog(self) -> None:
         """Mở dialog chỉnh metadata của note hiện tại."""
+        if not self._show_note_actions:
+            return
         if self._note_id is None or self._notes_dir is None or self._current_note_type is None:
             return
 
@@ -959,13 +1030,18 @@ class MarkdownEditorWidget(QWidget):
 
     def _update_hashtag_popup(self) -> None:
         """Cập nhật popup gợi ý hashtag theo prefix hiện tại."""
+        try:
+            popup = self._hashtag_completer.popup()
+        except RuntimeError:
+            return
+
         if self._note_id is None or not self._editor.hasFocus():
-            self._hashtag_completer.popup().hide()
+            popup.hide()
             return
 
         ctx = self._current_hashtag_context()
         if ctx is None:
-            self._hashtag_completer.popup().hide()
+            popup.hide()
             return
 
         _, token = ctx
@@ -978,12 +1054,12 @@ class MarkdownEditorWidget(QWidget):
             matches.append(prefix)  # Cho phép tạo mới
 
         if not prefix and not matches:
-            self._hashtag_completer.popup().hide()
+            popup.hide()
             return
 
         items = [f"#{name}" for name in matches]
         if not items:
-            self._hashtag_completer.popup().hide()
+            popup.hide()
             return
 
         self._hashtag_model.setStringList(items)
@@ -1070,13 +1146,18 @@ class MarkdownEditorWidget(QWidget):
 
     def _update_wikilink_popup(self) -> None:
         """Hiển thị popup gợi ý title note / heading / block khi đang gõ [[."""
+        try:
+            popup = self._wikilink_completer.popup()
+        except RuntimeError:
+            return
+
         if self._note_id is None or not self._editor.hasFocus():
-            self._wikilink_completer.popup().hide()
+            popup.hide()
             return
 
         ctx = self._current_wikilink_context()
         if ctx is None:
-            self._wikilink_completer.popup().hide()
+            popup.hide()
             return
 
         content_start, note_part, mode, sub_token = ctx
@@ -1094,7 +1175,7 @@ class MarkdownEditorWidget(QWidget):
                     matches.append(display)
                     self._wikilink_display_to_title[display] = title
             if not matches:
-                self._wikilink_completer.popup().hide()
+                popup.hide()
                 return
             # Thêm dòng gợi ý ở cuối
             hint_items = ["── Gõ # để liên kết với đề mục (heading)"]
@@ -1109,7 +1190,7 @@ class MarkdownEditorWidget(QWidget):
             headings = self._extract_headings_from_note(note_part)
             matches = [h for h in headings if sub_prefix in h.lower()] if sub_prefix else headings
             if not matches:
-                self._wikilink_completer.popup().hide()
+                popup.hide()
                 return
             self._wikilink_model.setStringList(matches)
             self._wikilink_completer.setCompletionPrefix(sub_token)
@@ -1201,6 +1282,8 @@ class MarkdownEditorWidget(QWidget):
 
     def _open_tags_dialog(self) -> None:
         """Mở dialog quản lý tags của note hiện tại."""
+        if not self._show_note_actions:
+            return
         if self._note_id is None:
             return
         from ui.widgets.dialogs.note_tags_dialog import NoteTagsDialog
@@ -1210,6 +1293,8 @@ class MarkdownEditorWidget(QWidget):
 
     def _open_wikilinks_dialog(self) -> None:
         """Mở dialog quản lý wikilinks của note hiện tại."""
+        if not self._show_note_actions:
+            return
         if self._note_id is None:
             return
         from ui.widgets.dialogs.note_wikilinks_dialog import NoteWikilinksDialog

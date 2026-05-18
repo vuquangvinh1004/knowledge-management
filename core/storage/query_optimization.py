@@ -143,11 +143,12 @@ def get_note_delete_impact(session: Session, note_id: int) -> NoteDeleteImpact:
         NoteDeleteImpact DTO.
     
     Raises:
-        Exception: Nếu note không tồn tại hoặc đã soft-deleted.
+        Exception: Nếu note không tồn tại.
     """
     # Lấy note + aggregated counts trong 1-2 queries (thay vì 8)
+    # Allow soft-deleted notes vì user có thể muốn xóa cứng chúng
     note = session.get(Note, note_id)
-    if note is None or note.is_deleted:
+    if note is None:
         raise Exception(f"Không tìm thấy note id={note_id}.")
     
     # Aggregation approach: dùng func.count() + group_by hoặc subqueries

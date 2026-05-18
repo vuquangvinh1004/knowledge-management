@@ -23,15 +23,31 @@ def open_import_dialog(window: Any) -> None:
 
 
 def open_source_in_workspace(window: Any, source_id: int, workspace_index: int) -> None:
-    """Mở source trong workspace và chuyển tab."""
-    window._workspace_view.open_source(source_id)
+    """Mở source trong tab GC Nguồn của Quản lý ghi chú."""
+    window._note_management_view.open_source(source_id)
+    window._navigate_to(workspace_index)
+
+
+def open_source_in_draft_workspace(window: Any, source_id: int, workspace_index: int) -> None:
+    """Mở source PDF vào Workspace tham khảo (không gắn note)."""
+    window._workspace_view.open_reference_source(source_id)
     window._navigate_to(workspace_index)
 
 
 def save_current_note(window: Any) -> None:
     """Lưu note hiện tại nếu đang có note mở."""
-    dual = window._workspace_view._dual_pane
-    if dual._note_id is not None:
+    workspace = getattr(window, "_workspace_view", None)
+    if workspace is None:
+        return
+
+    # Workspace nháp mới: lưu file markdown tạm.
+    if hasattr(workspace, "request_save_scratch_file"):
+        workspace.request_save_scratch_file()
+        return
+
+    # Backward compatibility cho workspace cũ.
+    dual = getattr(workspace, "_dual_pane", None)
+    if dual is not None and getattr(dual, "_note_id", None) is not None:
         dual._md_editor._do_save()
 
 

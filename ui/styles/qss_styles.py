@@ -233,10 +233,14 @@ QToolBar QToolButton:checked {
 
 /* Toolbar trong workspace */
 QWidget#editor_header,
-QWidget#extraction_toolbar,
 QWidget#pdf_nav_bar {
     background-color: #FFFFFF;
     border-bottom: 1px solid #E0E0E0;
+}
+
+QWidget#extraction_toolbar {
+    background-color: #FFFFFF;
+    border-top: 1px solid #E0E0E0;
 }
 
 QLabel#editor_title,
@@ -478,9 +482,12 @@ QTabWidget#source_tabs::pane {
 }
 
 QTabWidget#source_tabs QTabBar::tab {
-    background-color: #3B3B3B;
+    background-color: #B22323;
     color: #FFFFFF;
-    padding: 6px 14px;
+    padding: 2px 12px;
+    height: 22px;
+    min-height: 22px;
+    max-height: 22px;
     margin-right: 2px;
     border-top-left-radius: 4px;
     border-top-right-radius: 4px;
@@ -488,7 +495,7 @@ QTabWidget#source_tabs QTabBar::tab {
 }
 
 QTabWidget#source_tabs QTabBar::tab:selected {
-    background-color: #2F4CC8;
+    background-color: #C62828;
     color: #FFFFFF;
     font-weight: 700;
 }
@@ -497,6 +504,38 @@ QTabWidget#source_tabs QTabBar::close-button {
     image: none;
     width: 12px;
     height: 12px;
+}
+
+/* === Draft workspace reference tabs (compact) === */
+QTabWidget#workspace_ref_tabs::pane {
+    border: 1px solid #D0D4E8;
+    border-top: none;
+    background-color: #FFFFFF;
+}
+
+QTabWidget#workspace_ref_tabs QTabBar::tab {
+    background-color: #B22323;
+    color: #FFFFFF;
+    padding: 1px 10px;
+    height: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    margin-right: 2px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    font-weight: 600;
+}
+
+QTabWidget#workspace_ref_tabs QTabBar::tab:selected {
+    background-color: #C62828;
+    color: #FFFFFF;
+    font-weight: 700;
+}
+
+QTabWidget#workspace_ref_tabs QTabBar::close-button {
+    image: none;
+    width: 11px;
+    height: 11px;
 }
 
 /* === Text editors === */

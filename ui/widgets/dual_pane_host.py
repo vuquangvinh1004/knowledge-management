@@ -69,8 +69,6 @@ class DualPaneHost(QWidget):
 
         self.setObjectName("workspace_host")
 
-        layout.addWidget(self._build_extraction_toolbar())
-
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setObjectName("dual_pane_splitter")
 
@@ -84,11 +82,13 @@ class DualPaneHost(QWidget):
         splitter.addWidget(self._tab_widget)
 
         self._md_editor = MarkdownEditorWidget()
+        self._md_editor.set_note_actions_visible(False)
         splitter.addWidget(self._md_editor)
         splitter.setSizes([600, 600])
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 1)
         layout.addWidget(splitter, stretch=1)
+        layout.addWidget(self._build_extraction_toolbar())
 
     def _build_extraction_toolbar(self) -> QWidget:
         bar = QWidget()

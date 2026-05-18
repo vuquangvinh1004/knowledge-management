@@ -271,11 +271,13 @@ class SourceDetailPanel(QWidget):
     Đặt ở phía phải của LibraryView qua QSplitter.
 
     Signals:
-        open_requested(int): Khi nhấn 'Mở tài liệu'.
+        open_requested(int): Khi nhấn 'Ghi chú nguồn'.
+        open_reference_requested(int): Khi nhấn 'Mở tài liệu'.
         refresh_requested: Khi metadata đã được cập nhật.
     """
 
     open_requested = Signal(int)
+    open_reference_requested = Signal(int)
     refresh_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -485,12 +487,18 @@ class SourceDetailPanel(QWidget):
         btn_lay.setContentsMargins(10, 8, 10, 8)
         btn_lay.setSpacing(6)
 
-        self._btn_open = QPushButton("Mở tài liệu")
+        self._btn_open = QPushButton("Ghi chú nguồn")
         self._btn_open.setObjectName("primary_button")
         self._btn_open.setMinimumHeight(34)
         self._btn_open.setEnabled(False)
         self._btn_open.clicked.connect(self._on_open)
         btn_lay.addWidget(self._btn_open)
+
+        self._btn_open_reference = QPushButton("Mở tài liệu")
+        self._btn_open_reference.setMinimumHeight(34)
+        self._btn_open_reference.setEnabled(False)
+        self._btn_open_reference.clicked.connect(self._on_open_reference)
+        btn_lay.addWidget(self._btn_open_reference)
 
         self._btn_edit = QPushButton("Chỉnh sửa thông tin")
         self._btn_edit.clicked.connect(self._on_edit)
@@ -516,6 +524,7 @@ class SourceDetailPanel(QWidget):
             return
         self._source_id = source_id
         self._btn_open.setEnabled(True)
+        self._btn_open_reference.setEnabled(True)
         self._populate(source)
         self._stack.setCurrentIndex(1)
         self._load_thumbnail(source.file_path)
@@ -524,6 +533,7 @@ class SourceDetailPanel(QWidget):
         """Xóa và hiển thị empty state."""
         self._source_id = None
         self._btn_open.setEnabled(False)
+        self._btn_open_reference.setEnabled(False)
         self._stack.setCurrentIndex(0)
 
     # ------------------------------------------------------------------
@@ -621,6 +631,10 @@ class SourceDetailPanel(QWidget):
     def _on_open(self) -> None:
         if self._source_id is not None:
             self.open_requested.emit(self._source_id)
+
+    def _on_open_reference(self) -> None:
+        if self._source_id is not None:
+            self.open_reference_requested.emit(self._source_id)
 
     def _on_edit(self) -> None:
         if self._source_id is None:

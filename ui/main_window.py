@@ -5,14 +5,12 @@ Business logic KHÔNG được viết ở đây — chỉ layout và điều hư
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
     QHBoxLayout,
     QVBoxLayout,
     QStackedWidget,
-    QToolBar,
 )
 
 from config.settings import get_settings
@@ -24,8 +22,8 @@ from ui.widgets.status_strip import StatusStrip
 from ui.widgets.warning_banner import WarningBanner
 from ui.views.dashboard_view import DashboardView
 from ui.views.library_view import LibraryView
-from ui.views.workspace_view import WorkspaceView
-from ui.views.note_management_view import NoteManagementView
+from ui.views.draft_workspace_view import DraftWorkspaceView
+from ui.views.note_management_shell_view import NoteManagementShellView
 from ui.views.board_view import BoardView
 from ui.views.settings_view import SettingsView
 from core.services.project_service import ProjectService
@@ -49,7 +47,6 @@ class MainWindow(QMainWindow):
         self._settings = get_settings()
         self._project_service = ProjectService()
         self._setup_window()
-        self._build_toolbar()
         self._build_central()
         self._build_status_bar()
         self._connect_signals()
@@ -73,16 +70,6 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"{APP_NAME} — v{APP_VERSION}")
         self.setMinimumSize(900, 600)
 
-    def _build_toolbar(self) -> None:
-        toolbar = QToolBar("Thanh công cụ")
-        toolbar.setObjectName("main_toolbar")
-        toolbar.setMovable(False)
-        toolbar.setIconSize(QSize(20, 20))
-        toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-
-        self.addToolBar(toolbar)
-        self._toolbar = toolbar
-
     def _build_central(self) -> None:
         central = QWidget()
         central_layout = QVBoxLayout(central)
@@ -105,8 +92,8 @@ class MainWindow(QMainWindow):
         self._stack = QStackedWidget()
         self._dashboard_view = DashboardView()
         self._library_view = LibraryView()
-        self._workspace_view = WorkspaceView()
-        self._note_management_view = NoteManagementView()
+        self._workspace_view = DraftWorkspaceView()
+        self._note_management_view = NoteManagementShellView()
         self._board_view = BoardView()
         self._settings_view = SettingsView()
 
@@ -136,6 +123,7 @@ class MainWindow(QMainWindow):
 
         # Library
         self._library_view.open_source_requested.connect(self._open_source_in_workspace)
+        self._library_view.open_reference_requested.connect(self._open_reference_in_workspace)
         self._library_view.import_requested.connect(self._open_import_dialog)
 
         # Board / Graph view relay
@@ -146,12 +134,16 @@ class MainWindow(QMainWindow):
         self._note_management_view.note_open_requested.connect(self._open_note_in_workspace)
         self._note_management_view.note_deleted.connect(self._on_note_catalog_changed)
         self._note_management_view.note_created.connect(self._open_note_in_workspace)
+        self._note_management_view.library_requested.connect(lambda: self._navigate_to(NAV_LIBRARY))
 
         # Workspace empty state action
-        if self._workspace_view._empty_state.action_button:
-            self._workspace_view._empty_state.action_button.clicked.connect(
-                lambda: self._navigate_to(NAV_LIBRARY)
-            )
+        if hasattr(self._workspace_view, "_empty_state"):
+            empty_state = getattr(self._workspace_view, "_empty_state", None)
+            if empty_state and empty_state.action_button:
+                empty_state.action_button.clicked.connect(lambda: self._navigate_to(NAV_LIBRARY))
+
+        # Draft workspace relay
+        self._workspace_view.import_requested.connect(self._open_import_dialog)
 
         # Settings maintenance actions
         self._settings_view.source_titles_normalized.connect(self._on_note_catalog_changed)
@@ -180,8 +172,12 @@ class MainWindow(QMainWindow):
         mwh.open_import_dialog(self)
 
     def _open_source_in_workspace(self, source_id: int) -> None:
-        """Mở source trong workspace và chuyển sang tab Workspace."""
-        mwh.open_source_in_workspace(self, source_id, NAV_WORKSPACE)
+        """Mở source trong tab GC Nguồn và chuyển sang tab Quản lý ghi chú."""
+        mwh.open_source_in_workspace(self, source_id, NAV_NOTES)
+
+    def _open_reference_in_workspace(self, source_id: int) -> None:
+        """Mở PDF tham khảo trong tab Không gian làm việc."""
+        mwh.open_source_in_draft_workspace(self, source_id, NAV_WORKSPACE)
 
     def _save_current_note(self) -> None:
         """Lưu ghi chú đang mở trong workspace (nếu có)."""
@@ -247,6 +243,10 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:  # noqa: N802
         """Lưu geometry khi đóng cửa sổ."""
+        if hasattr(self._workspace_view, "confirm_close_with_unsaved_changes"):
+            if not self._workspace_view.confirm_close_with_unsaved_changes():
+                event.ignore()
+                return
         if not self.isMaximized():
             self._settings.set("window_width", self.width())
             self._settings.set("window_height", self.height())

@@ -16,11 +16,11 @@ class WorkspaceView(QWidget):
     Container cho DualPaneHost.
 
     Signals:
-        import_requested: Khi người dùng nhấn nút nhập từ empty state.
+        library_requested: Khi người dùng nhấn nút điều hướng sang Thư viện nguồn.
         source_opened(int): Relay từ DualPaneHost.
     """
 
-    import_requested = Signal()
+    library_requested = Signal()
     source_opened = Signal(int)
 
     def __init__(self, parent=None) -> None:
@@ -45,6 +45,8 @@ class WorkspaceView(QWidget):
             "Chưa có tài liệu nào được mở.\nVào Thư viện nguồn để chọn hoặc nhập PDF.",
             action_label="Vào Thư viện",
         )
+        if self._empty_state.action_button is not None:
+            self._empty_state.action_button.clicked.connect(self.library_requested.emit)
         self._stack.addWidget(self._empty_state)  # index 0
 
         # Trang 1: dual pane

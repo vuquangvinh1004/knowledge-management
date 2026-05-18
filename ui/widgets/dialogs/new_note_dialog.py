@@ -37,6 +37,7 @@ class NewNoteDialog(QDialog):
         current_note_title: str | None = None,
         active_project_id: int | None = None,
         active_project_name: str | None = None,
+        default_note_type: str | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Tạo note mới")
@@ -45,6 +46,7 @@ class NewNoteDialog(QDialog):
         self._current_note_title = (current_note_title or "").strip()
         self._active_project_id = active_project_id
         self._active_project_name = (active_project_name or "").strip()
+        self._default_note_type = default_note_type
         self._known_wikilinks: list[tuple[str, str]] = []
         self._wikilink_display_to_title: dict[str, str] = {}
         self._last_auto_title = ""
@@ -77,6 +79,10 @@ class NewNoteDialog(QDialog):
         self._combo_type = QComboBox()
         for note_type, label in _TYPE_ITEMS:
             self._combo_type.addItem(label, note_type)
+        if self._default_note_type:
+            idx = self._combo_type.findData(self._default_note_type)
+            if idx >= 0:
+                self._combo_type.setCurrentIndex(idx)
         self._combo_type.currentIndexChanged.connect(self._on_type_changed)
         form.addRow("Loại note:", self._combo_type)
 

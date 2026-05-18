@@ -123,7 +123,8 @@ class PDFViewerWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        layout.addWidget(self._build_nav_bar())
+        self._nav_bar = self._build_nav_bar()
+        layout.addWidget(self._nav_bar)
 
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(False)
@@ -141,6 +142,7 @@ class PDFViewerWidget(QWidget):
         layout.addWidget(self._empty_label)
 
         self._set_document_loaded(False)
+        self.set_compact_navigation(False)
 
     def _build_nav_bar(self) -> QWidget:
         bar = QWidget()
@@ -259,6 +261,37 @@ class PDFViewerWidget(QWidget):
         """Đặt chế độ chọn vùng: SELECTION_NONE / TEXT / TABLE / IMAGE."""
         self._selection_mode = mode
         self._page_label.set_selection_active(mode != SELECTION_NONE)
+
+    def set_navigation_visible(self, visible: bool) -> None:
+        """Hiện/ẩn thanh điều hướng PDF để tối ưu không gian đọc."""
+        self._nav_bar.setVisible(visible)
+
+    def set_compact_navigation(self, enabled: bool) -> None:
+        """Giảm chiều cao và khoảng đệm của toolbar điều hướng PDF."""
+        if enabled:
+            self._nav_bar.setMinimumHeight(34)
+            self._nav_bar.setMaximumHeight(34)
+            self._btn_prev.setFixedSize(30, 24)
+            self._btn_next.setFixedSize(30, 24)
+            self._btn_zoom_out.setFixedSize(30, 24)
+            self._btn_zoom_in.setFixedSize(30, 24)
+            self._spin_page.setFixedWidth(52)
+            self._lbl_total.setFixedWidth(40)
+            self._lbl_zoom.setFixedWidth(42)
+        else:
+            self._nav_bar.setMinimumHeight(0)
+            self._nav_bar.setMaximumHeight(16777215)
+            self._btn_prev.setMinimumSize(0, 0)
+            self._btn_prev.setMaximumSize(16777215, 16777215)
+            self._btn_next.setMinimumSize(0, 0)
+            self._btn_next.setMaximumSize(16777215, 16777215)
+            self._btn_zoom_out.setMinimumSize(0, 0)
+            self._btn_zoom_out.setMaximumSize(16777215, 16777215)
+            self._btn_zoom_in.setMinimumSize(0, 0)
+            self._btn_zoom_in.setMaximumSize(16777215, 16777215)
+            self._spin_page.setFixedWidth(60)
+            self._lbl_total.setFixedWidth(48)
+            self._lbl_zoom.setFixedWidth(44)
 
     # ------------------------------------------------------------------
     # Navigation

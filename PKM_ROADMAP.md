@@ -3,6 +3,7 @@
 > Cập nhật: 2026-05-12 (Public-readiness cleanup + logging hardening)
 > Phiên bản mục tiêu: v1.0.0-alpha
 > Mục tiêu: desktop app ổn định, local-first, source-grounded, đủ mạnh cho đọc PDF, trích xuất, ghi chú và tổng hợp nghiên cứu
+> Cập nhật UI shell gần nhất: 2026-05-18 (tối giản GC Nguồn, chuyển GC Khái niệm/GC Tổng hợp sang single-editor + document tabs)
 
 ---
 
@@ -670,5 +671,19 @@ CHANGED | GitHub Copilot (GPT-5.3-Codex) | UI_SHELL | Chuyển hiển thị `Mod
 CHANGED | GitHub Copilot (GPT-5.3-Codex) | UI_SHELL | Loại bỏ hoàn toàn nút `Project` trên toolbar; trạng thái mode chỉ còn hiển thị trong tab `Thiết lập`.
 
 CHANGED | GitHub Copilot (GPT-5.3-Codex) | UI_SETTINGS | Mode trong tab `Thiết lập` hiển thị dạng badge màu để nhận biết nhanh: Global màu xanh lá, Project màu xanh dương.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | WORKSPACE_V2 | Nâng cấp `Không gian làm việc` sang 2 khung độc lập: PDF tham khảo nhiều tab ở panel trái và editor Markdown scratch (file-based, không gắn note DB) ở panel phải; hỗ trợ lưu thủ công `.md` và cảnh báo lưu khi đóng ứng dụng nếu còn thay đổi chưa lưu.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | LIBRARY_TO_WORKSPACE | `Thư viện nguồn` thêm action `Mở tài liệu` để mở trực tiếp PDF vào workspace tham khảo mới, tách biệt với action `Ghi chú nguồn`.
+
+FIXED | GitHub Copilot (GPT-5.3-Codex) | NOTE_DELETE | Sửa lỗi xóa cứng note đã soft-delete: cho phép phân tích impact trên deleted note để không còn báo lỗi "Không tìm thấy note id=..." trước khi xác nhận xóa cứng.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | WORKSPACE_UX | Tinh gọn header `Không gian làm việc`: bỏ tiêu đề text dư thừa, thêm nhãn trạng thái file scratch theo thời gian thực (`<file>.md • Đã lưu/Chưa lưu*`) và thêm nút `Đóng tất cả` tab PDF tham khảo.
+
+ADDED | GitHub Copilot (GPT-5.3-Codex) | TESTS_UI | Bổ sung smoke tests cho UX mới của `DraftWorkspaceView` (status label, không còn tiêu đề trên cùng, đóng tất cả tab) và test `MainWindow.closeEvent` chặn đóng app khi workspace trả về từ chối xác nhận lưu.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | WORKSPACE_READING_SPACE | Tối ưu không gian đọc bên trái trong `Không gian làm việc`: toolbar PDF compact hơn, tab tài liệu dùng compact style riêng, và thêm toggle `Tập trung đọc` để ẩn toolbar điều hướng PDF khi cần đọc liên tục.
+
+ADDED | GitHub Copilot (GPT-5.3-Codex) | TESTS_UI | Thêm regression smoke test cho read-focus mode (`DraftWorkspaceView`) để đảm bảo bật chế độ đọc tập trung sẽ ẩn toolbar PDF đúng hành vi.
 
 TEST STATUS | `python -m pytest tests/ui/test_smoke.py -q` | 54/54 passed.

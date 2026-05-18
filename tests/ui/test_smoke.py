@@ -82,6 +82,35 @@ class TestMainWindowSmoke:
         qtbot.addWidget(win)
         assert not hasattr(win, "_btn_manage_projects")
 
+    def test_gc_nguon_empty_state_button_navigates_to_library(self, qtbot, db_session):
+        from ui.main_window import MainWindow, NAV_LIBRARY, NAV_NOTES
+
+        win = MainWindow()
+        qtbot.addWidget(win)
+        win._navigate_to(NAV_NOTES)
+
+        btn = win._note_management_view._source_workspace._empty_state.action_button
+        assert btn is not None
+
+        qtbot.mouseClick(btn, Qt.MouseButton.LeftButton)
+        assert win._stack.currentIndex() == NAV_LIBRARY
+
+    def test_close_event_is_blocked_when_workspace_close_confirmation_rejects(self, qtbot, db_session, monkeypatch):
+        from PySide6.QtGui import QCloseEvent
+        from ui.main_window import MainWindow
+
+        win = MainWindow()
+        qtbot.addWidget(win)
+        monkeypatch.setattr(
+            win._workspace_view,
+            "confirm_close_with_unsaved_changes",
+            lambda: False,
+        )
+
+        event = QCloseEvent()
+        win.closeEvent(event)
+        assert not event.isAccepted()
+
 
 # ---------------------------------------------------------------------------
 # DashboardView smoke test
@@ -119,6 +148,13 @@ class TestLibraryViewSmoke:
         view.refresh()
         assert view._list_widget.count() == 0
 
+    def test_source_detail_has_open_reference_button(self, qtbot):
+        from ui.widgets.source_detail_panel import SourceDetailPanel
+
+        panel = SourceDetailPanel()
+        qtbot.addWidget(panel)
+        assert hasattr(panel, "_btn_open_reference")
+
 
 # ---------------------------------------------------------------------------
 # WorkspaceView smoke test
@@ -137,6 +173,203 @@ class TestWorkspaceViewSmoke:
         qtbot.addWidget(view)
         # index 0 = empty state
         assert view._stack.currentIndex() == 0
+
+
+class TestDraftWorkspaceViewSmoke:
+    def test_draft_workspace_does_not_auto_create_ban_nhap_note(self, qtbot, db_session):
+        from core.storage.models import Note
+        from core.storage.session import get_session
+        from ui.views.draft_workspace_view import DraftWorkspaceView
+
+        view = DraftWorkspaceView()
+        qtbot.addWidget(view)
+
+        with get_session() as session:
+            count_ban_nhap = (
+                session.query(Note)
+                .filter(Note.title == "Bản nháp", Note.note_type == "concept_note", Note.is_deleted == 0)
+                .count()
+            )
+        assert count_ban_nhap == 0
+
+    def test_draft_workspace_can_open_reference_pdf_tab(self, qtbot, monkeypatch, tmp_path):
+        from types import SimpleNamespace
+
+        from core.services import source_service as source_service_module
+        from ui.views.draft_workspace_view import DraftWorkspaceView
+        from ui.widgets import pdf_viewer as pdf_viewer_module
+
+        fake_pdf = tmp_path / "ref.pdf"
+        fake_pdf.write_bytes(b"%PDF-1.4\n%fake")
+
+        monkeypatch.setattr(
+            source_service_module.SourceService,
+            "get_by_id",
+            lambda _self, _sid: SimpleNamespace(
+                file_path=str(fake_pdf),
+                last_opened_page=1,
+                title="Tai lieu tham khao",
+            ),
+        )
+        monkeypatch.setattr(
+            pdf_viewer_module.PDFViewerWidget,
+            "open_document",
+            lambda _self, _path, _page=1: None,
+        )
+
+        view = DraftWorkspaceView()
+        qtbot.addWidget(view)
+        view.open_reference_source(1)
+
+        assert view._pdf_tabs.count() == 1
+
+    def test_reference_toggle_disabled_until_source_opened(self, qtbot, monkeypatch, tmp_path):
+        from types import SimpleNamespace
+
+        from core.services import source_service as source_service_module
+        from ui.views.draft_workspace_view import DraftWorkspaceView
+        from ui.widgets import pdf_viewer as pdf_viewer_module
+
+        fake_pdf = tmp_path / "ref.pdf"
+        fake_pdf.write_bytes(b"%PDF-1.4\n%fake")
+
+        monkeypatch.setattr(
+            source_service_module.SourceService,
+            "get_by_id",
+            lambda _self, _sid: SimpleNamespace(
+                file_path=str(fake_pdf),
+                last_opened_page=1,
+                title="Tai lieu tham khao",
+            ),
+        )
+        monkeypatch.setattr(
+            pdf_viewer_module.PDFViewerWidget,
+            "open_document",
+            lambda _self, _path, _page=1: None,
+        )
+
+        view = DraftWorkspaceView()
+        qtbot.addWidget(view)
+        assert not view._btn_toggle_left.isEnabled()
+
+        view.open_reference_source(1)
+        assert view._btn_toggle_left.isEnabled()
+
+    def test_draft_workspace_has_status_label_and_no_top_title(self, qtbot):
+        from PySide6.QtWidgets import QLabel
+        from ui.views.draft_workspace_view import DraftWorkspaceView
+
+        view = DraftWorkspaceView()
+        qtbot.addWidget(view)
+
+        labels = view.findChildren(QLabel)
+        texts = [lbl.text() for lbl in labels]
+
+        assert hasattr(view, "_lbl_scratch_status")
+        assert "Không gian làm việc" not in texts
+
+    def test_draft_workspace_close_all_reference_tabs(self, qtbot, monkeypatch, tmp_path):
+        from types import SimpleNamespace
+
+        from core.services import source_service as source_service_module
+        from ui.views.draft_workspace_view import DraftWorkspaceView
+        from ui.widgets import pdf_viewer as pdf_viewer_module
+
+        fake_pdf_1 = tmp_path / "ref_1.pdf"
+        fake_pdf_2 = tmp_path / "ref_2.pdf"
+        fake_pdf_1.write_bytes(b"%PDF-1.4\n%fake1")
+        fake_pdf_2.write_bytes(b"%PDF-1.4\n%fake2")
+
+        monkeypatch.setattr(
+            source_service_module.SourceService,
+            "get_by_id",
+            lambda _self, sid: SimpleNamespace(
+                file_path=str(fake_pdf_1 if sid == 1 else fake_pdf_2),
+                last_opened_page=1,
+                title=f"Tai lieu {sid}",
+            ),
+        )
+        monkeypatch.setattr(
+            pdf_viewer_module.PDFViewerWidget,
+            "open_document",
+            lambda _self, _path, _page=1: None,
+        )
+
+        view = DraftWorkspaceView()
+        qtbot.addWidget(view)
+        view.open_reference_source(1)
+        view.open_reference_source(2)
+        assert view._pdf_tabs.count() == 2
+
+        view._close_all_reference_tabs()
+        assert view._pdf_tabs.count() == 0
+
+    def test_draft_workspace_read_focus_hides_pdf_navigation(self, qtbot, monkeypatch, tmp_path):
+        from types import SimpleNamespace
+
+        from core.services import source_service as source_service_module
+        from ui.views.draft_workspace_view import DraftWorkspaceView
+        from ui.widgets import pdf_viewer as pdf_viewer_module
+
+        fake_pdf = tmp_path / "ref.pdf"
+        fake_pdf.write_bytes(b"%PDF-1.4\n%fake")
+
+        monkeypatch.setattr(
+            source_service_module.SourceService,
+            "get_by_id",
+            lambda _self, _sid: SimpleNamespace(
+                file_path=str(fake_pdf),
+                last_opened_page=1,
+                title="Tai lieu tham khao",
+            ),
+        )
+        monkeypatch.setattr(
+            pdf_viewer_module.PDFViewerWidget,
+            "open_document",
+            lambda _self, _path, _page=1: None,
+        )
+
+        view = DraftWorkspaceView()
+        qtbot.addWidget(view)
+        view.show()
+        view.open_reference_source(1)
+
+        assert view._pdf_viewers[0]._nav_bar.isVisible()
+        view._toggle_read_focus_mode()
+        assert not view._pdf_viewers[0]._nav_bar.isVisible()
+
+
+class TestNoteListEditorTabSmoke:
+    def test_synthesis_create_tab_works_when_it_is_only_tab(self, qtbot, db_session, tmp_path, monkeypatch):
+        from ui.widgets import note_list_editor_tab as note_tab_module
+
+        notes_dir = tmp_path / "notes"
+        assets_dir = tmp_path / "assets"
+        notes_dir.mkdir()
+        assets_dir.mkdir()
+        monkeypatch.setattr(note_tab_module, "NOTES_DIR", notes_dir)
+        monkeypatch.setattr(note_tab_module, "ASSETS_DIR", assets_dir)
+        monkeypatch.setattr(
+            note_tab_module.QInputDialog,
+            "getText",
+            staticmethod(lambda *_args, **_kwargs: ("Tổng hợp mới", True)),
+        )
+
+        tab = note_tab_module.NoteListEditorTab("synthesis_note")
+        qtbot.addWidget(tab)
+        tab.refresh()
+        tab.show()
+
+        assert tab._doc_tabs.count() == 1
+        assert tab._tab_note_ids == [None]
+
+        create_tab_rect = tab._doc_tabs.tabRect(0)
+        qtbot.mouseClick(tab._doc_tabs, Qt.MouseButton.LeftButton, pos=create_tab_rect.center())
+
+        assert tab._doc_tabs.count() == 2
+        assert tab._current_tab_note_id() is not None
+        assert tab._btn_delete.isEnabled()
+        assert tab._btn_hard_delete.isEnabled()
 
 
 class TestDualPaneHostRecoverySmoke:
