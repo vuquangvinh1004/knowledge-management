@@ -165,3 +165,112 @@ class TestExtractionPipeline:
             assert anchor.startswith(f"source://{src.id}?page=1")
         finally:
             doc.close()
+
+
+class TestDraftWorkspaceScratchExtraction:
+    def test_text_extract_inserts_into_scratch_editor_and_persists_extract(
+        self,
+        qtbot,
+        source_service,
+        extract_service,
+        sample_pdf_path,
+        monkeypatch,
+    ):
+        from ui.views.draft_workspace_view import DraftWorkspaceView
+
+        src = source_service.import_source(sample_pdf_path, title="Scratch Extraction PDF")
+
+        monkeypatch.setattr(
+            "core.extraction.pdf_text.extract_region_text",
+            lambda _doc, _page_no, _rect: "Đây là nội dung trích trong workspace.",
+        )
+
+        view = DraftWorkspaceView()
+        qtbot.addWidget(view)
+        view.show()
+        view.open_reference_source(src.id)
+
+        view._on_text_selected(src.id, 1, (0, 0, 200, 100))
+
+        content = view._draft_editor.get_content()
+        assert "Đây là nội dung trích trong workspace." in content
+        extracts = extract_service.list_by_source(src.id)
+        assert len(extracts) == 1
+        assert extracts[0].note_id is None
+        assert extracts[0].extract_type == "text"
+
+    def test_table_extract_inserts_into_scratch_editor_and_persists_extract(
+        self,
+        qtbot,
+        source_service,
+        extract_service,
+        sample_pdf_path,
+        monkeypatch,
+    ):
+        from ui.views.draft_workspace_view import DraftWorkspaceView
+
+        src = source_service.import_source(sample_pdf_path, title="Scratch Table PDF")
+
+        monkeypatch.setattr(
+            "core.extraction.pdf_table.extract_table_from_region",
+            lambda _file_path, _page_no, _rect: [
+                ["Cột A", "Cột B"],
+                ["Giá trị 1", "Giá trị 2"],
+            ],
+        )
+        monkeypatch.setattr(
+            "ui.widgets.dialogs.table_preview_dialog.TablePreviewDialog.exec",
+            lambda self: 1,
+        )
+
+        view = DraftWorkspaceView()
+        qtbot.addWidget(view)
+        view.show()
+        view.open_reference_source(src.id)
+
+        view._on_table_selected(src.id, 1, (0, 0, 240, 120))
+
+        content = view._draft_editor.get_content()
+        assert "| Cột A | Cột B |" in content
+        assert "| Giá trị 1 | Giá trị 2 |" in content
+        extracts = extract_service.list_by_source(src.id)
+        assert len(extracts) == 1
+        assert extracts[0].note_id is None
+        assert extracts[0].extract_type == "table"
+
+    def test_image_capture_inserts_asset_ref_and_persists_asset(
+        self,
+        qtbot,
+        source_service,
+        sample_pdf_path,
+        monkeypatch,
+        tmp_path,
+    ):
+        from config.paths import NOTES_DIR
+        from core.services.asset_service import AssetService
+        from core.services.workspace_orchestrator import WorkspaceOrchestrator
+        from ui.views.draft_workspace_view import DraftWorkspaceView
+
+        src = source_service.import_source(sample_pdf_path, title="Scratch Image PDF")
+        assets_dir = tmp_path / "scratch_assets"
+
+        monkeypatch.setattr(
+            "core.extraction.pdf_image.capture_region",
+            lambda _doc, _page_no, _rect: b"\x89PNG\r\n\x1a\n" + b"\x00" * 64,
+        )
+
+        view = DraftWorkspaceView()
+        view._orchestrator = WorkspaceOrchestrator(NOTES_DIR, assets_dir)
+        qtbot.addWidget(view)
+        view.show()
+        view.open_reference_source(src.id)
+
+        view._on_image_selected(src.id, 1, (0, 0, 180, 180))
+
+        assets = AssetService(assets_dir).list_by_source(src.id)
+        assert len(assets) == 1
+        assert assets[0].note_id is None
+        assert assets[0].asset_type == "image"
+        assert Path(assets[0].file_path).exists()
+        content = view._draft_editor.get_content()
+        assert assets[0].file_path in content

@@ -199,6 +199,32 @@ QPushButton#primary_button:hover {
     background-color: #2F4CC8;
 }
 
+/* === Workspace extraction actions === */
+QPushButton[workspaceRole="extract-action"] {
+    background-color: #7B3FE4;
+    color: #FFFFFF;
+    border: 1px solid #6432BC;
+    font-weight: 600;
+}
+
+QPushButton[workspaceRole="extract-action"]:hover {
+    background-color: #6A35C6;
+    border-color: #5B2BAF;
+}
+
+QPushButton[workspaceRole="extract-action"]:pressed,
+QPushButton[workspaceRole="extract-action"]:checked {
+    background-color: #5B2BAF;
+    border-color: #4E2398;
+    color: #FFFFFF;
+}
+
+QPushButton[workspaceRole="extract-action"]:disabled {
+    background-color: #EEE6FF;
+    color: #8A7AAE;
+    border-color: #D9C9FB;
+}
+
 /* === Toolbar === */
 QToolBar {
     background-color: #FFFFFF;

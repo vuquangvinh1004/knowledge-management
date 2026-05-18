@@ -18,8 +18,15 @@ from PySide6.QtWidgets import (
 )
 
 from core.services.source_service import SourceService
+from core.services.workspace_orchestrator import WorkspaceOrchestrator
 from ui.widgets.markdown_editor import MarkdownEditorWidget
-from ui.widgets.pdf_viewer import PDFViewerWidget
+from ui.widgets.pdf_viewer import (
+    PDFViewerWidget,
+    SELECTION_IMAGE,
+    SELECTION_NONE,
+    SELECTION_TABLE,
+    SELECTION_TEXT,
+)
 
 
 class DraftWorkspaceView(QWidget):
@@ -30,8 +37,12 @@ class DraftWorkspaceView(QWidget):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        from config.paths import ASSETS_DIR, NOTES_DIR
+
+        self._orchestrator = WorkspaceOrchestrator(NOTES_DIR, ASSETS_DIR)
         self._project_id: int | None = None
         self._source_ids: list[int] = []
+        self._source_codes: list[str | None] = []
         self._pdf_viewers: list[PDFViewerWidget] = []
         self._scratch_file_path: Path | None = None
         self._read_focus_mode = False
@@ -48,30 +59,51 @@ class DraftWorkspaceView(QWidget):
         header_lay.setContentsMargins(12, 8, 12, 8)
         header_lay.setSpacing(8)
 
-        self._lbl_scratch_status = QLabel("")
-        self._lbl_scratch_status.setObjectName("editor_save_status")
-        header_lay.addWidget(self._lbl_scratch_status)
-        header_lay.addStretch()
-
         self._btn_new_md = QPushButton("Tệp mới")
         self._btn_new_md.setToolTip("Tạo file soạn thảo markdown mới")
         self._btn_new_md.clicked.connect(self._new_scratch_file)
-        header_lay.addWidget(self._btn_new_md)
 
         self._btn_open_md = QPushButton("Mở .md")
         self._btn_open_md.setToolTip("Mở file Markdown (.md)")
         self._btn_open_md.clicked.connect(self._open_scratch_file)
-        header_lay.addWidget(self._btn_open_md)
 
         self._btn_save_md = QPushButton("Lưu")
         self._btn_save_md.setToolTip("Lưu file Markdown hiện tại (Ctrl+S)")
         self._btn_save_md.setObjectName("primary_button")
         self._btn_save_md.clicked.connect(self.request_save_scratch_file)
-        header_lay.addWidget(self._btn_save_md)
 
         self._btn_save_as_md = QPushButton("Lưu thành...")
         self._btn_save_as_md.setToolTip("Lưu thành file Markdown khác (Ctrl+Shift+S)")
         self._btn_save_as_md.clicked.connect(lambda: self.request_save_scratch_file(force_pick_path=True))
+
+        self._btn_extract_text = QPushButton("Trích văn bản")
+        self._btn_extract_text.setToolTip("Kéo chọn vùng văn bản trên PDF đang mở")
+        self._btn_extract_text.setCheckable(True)
+        self._btn_extract_text.setProperty("workspaceRole", "extract-action")
+        self._btn_extract_text.clicked.connect(lambda: self._activate_extraction_mode(SELECTION_TEXT))
+        header_lay.addWidget(self._btn_extract_text)
+
+        self._btn_extract_table = QPushButton("Trích bảng")
+        self._btn_extract_table.setToolTip("Kéo chọn vùng bảng trên PDF đang mở")
+        self._btn_extract_table.setCheckable(True)
+        self._btn_extract_table.setProperty("workspaceRole", "extract-action")
+        self._btn_extract_table.clicked.connect(lambda: self._activate_extraction_mode(SELECTION_TABLE))
+        header_lay.addWidget(self._btn_extract_table)
+
+        self._btn_capture_image = QPushButton("Chụp ảnh")
+        self._btn_capture_image.setToolTip("Kéo chọn vùng ảnh trên PDF đang mở")
+        self._btn_capture_image.setCheckable(True)
+        self._btn_capture_image.setProperty("workspaceRole", "extract-action")
+        self._btn_capture_image.clicked.connect(lambda: self._activate_extraction_mode(SELECTION_IMAGE))
+        header_lay.addWidget(self._btn_capture_image)
+
+        self._lbl_scratch_status = QLabel("")
+        self._lbl_scratch_status.setObjectName("editor_save_status")
+        header_lay.addStretch()
+        header_lay.addWidget(self._lbl_scratch_status)
+        header_lay.addWidget(self._btn_new_md)
+        header_lay.addWidget(self._btn_open_md)
+        header_lay.addWidget(self._btn_save_md)
         header_lay.addWidget(self._btn_save_as_md)
 
         self._btn_toggle_left = QPushButton("Tài liệu")
@@ -107,6 +139,7 @@ class DraftWorkspaceView(QWidget):
         self._pdf_tabs.setObjectName("workspace_ref_tabs")
         self._pdf_tabs.setTabsClosable(True)
         self._pdf_tabs.setMovable(True)
+        self._pdf_tabs.currentChanged.connect(self._on_reference_tab_changed)
         self._pdf_tabs.tabCloseRequested.connect(self._close_reference_tab)
         left_lay.addWidget(self._pdf_tabs)
 
@@ -162,12 +195,24 @@ class DraftWorkspaceView(QWidget):
             return
 
         viewer = PDFViewerWidget()
-        viewer.open_document(file_path, int(source.last_opened_page or 1))
+        start_page_raw = getattr(source, "last_opened_page", 1)
+        start_page = int(start_page_raw) if isinstance(start_page_raw, int) else 1
+        viewer.open_document(file_path, start_page)
         viewer.set_compact_navigation(True)
         viewer.set_navigation_visible(not self._read_focus_mode)
+        viewer.text_region_selected.connect(
+            lambda pg, rect, sid=source_id: self._on_text_selected(sid, pg, rect)
+        )
+        viewer.table_region_selected.connect(
+            lambda pg, rect, sid=source_id: self._on_table_selected(sid, pg, rect)
+        )
+        viewer.image_region_selected.connect(
+            lambda pg, rect, sid=source_id: self._on_image_selected(sid, pg, rect)
+        )
         viewer.page_changed.connect(lambda pg, sid=source_id: self._on_source_page_changed(sid, pg))
 
         self._source_ids.append(source_id)
+        self._source_codes.append(getattr(source, "source_code", None))
         self._pdf_viewers.append(viewer)
         tab_title = (str(source.title or file_path.name) or "Tài liệu").strip()[:30]
         tab_idx = self._pdf_tabs.addTab(viewer, tab_title)
@@ -301,9 +346,11 @@ class DraftWorkspaceView(QWidget):
         widget = self._pdf_tabs.widget(idx)
         self._pdf_tabs.removeTab(idx)
         self._source_ids.pop(idx)
+        self._source_codes.pop(idx)
         self._pdf_viewers.pop(idx)
         if widget is not None:
             widget.deleteLater()
+        self._reset_extraction_mode()
         self._update_panel_toggle_labels()
 
     def _close_all_reference_tabs(self) -> None:
@@ -315,6 +362,165 @@ class DraftWorkspaceView(QWidget):
         for viewer in self._pdf_viewers:
             viewer.set_navigation_visible(not self._read_focus_mode)
         self._update_panel_toggle_labels()
+
+    def _current_reference_index(self) -> int:
+        return self._pdf_tabs.currentIndex()
+
+    def _current_pdf_viewer(self) -> PDFViewerWidget | None:
+        idx = self._current_reference_index()
+        if 0 <= idx < len(self._pdf_viewers):
+            return self._pdf_viewers[idx]
+        return None
+
+    def _activate_extraction_mode(self, mode: int) -> None:
+        viewer = self._current_pdf_viewer()
+        if viewer is None:
+            self._reset_extraction_mode()
+            return
+
+        button_map = {
+            SELECTION_TEXT: self._btn_extract_text,
+            SELECTION_TABLE: self._btn_extract_table,
+            SELECTION_IMAGE: self._btn_capture_image,
+        }
+        current_btn = button_map.get(mode)
+        is_activating = current_btn is not None and current_btn.isChecked()
+
+        self._btn_extract_text.setChecked(False)
+        self._btn_extract_table.setChecked(False)
+        self._btn_capture_image.setChecked(False)
+
+        if is_activating and current_btn is not None:
+            current_btn.setChecked(True)
+            viewer.set_selection_mode(mode)
+        else:
+            viewer.set_selection_mode(SELECTION_NONE)
+
+    def _reset_extraction_mode(self) -> None:
+        self._btn_extract_text.setChecked(False)
+        self._btn_extract_table.setChecked(False)
+        self._btn_capture_image.setChecked(False)
+        viewer = self._current_pdf_viewer()
+        if viewer is not None:
+            viewer.set_selection_mode(SELECTION_NONE)
+
+    def _on_reference_tab_changed(self, _idx: int) -> None:
+        self._reset_extraction_mode()
+
+    def _on_text_selected(self, source_id: int, page_no: int, pdf_rect: tuple) -> None:
+        if source_id not in self._source_ids:
+            return
+
+        idx = self._source_ids.index(source_id)
+        viewer = self._pdf_viewers[idx]
+        if not viewer.file_path:
+            return
+
+        from core.extraction.pdf_text import extract_region_text
+
+        doc = viewer._doc
+        if doc is None:
+            return
+
+        raw = extract_region_text(doc, page_no, pdf_rect)
+        if not raw.strip():
+            QMessageBox.information(self, "Thông tin", "Vùng đã chọn không có văn bản.")
+            self._reset_extraction_mode()
+            return
+
+        text, anchor = self._orchestrator.prepare_text_extract(source_id, page_no, pdf_rect, raw)
+        source_code = self._source_codes[idx] if idx < len(self._source_codes) else None
+        extract_id = self._orchestrator.commit_extract(
+            source_id=source_id,
+            page_no=page_no,
+            extract_type="text",
+            source_anchor=anchor,
+            content_md=text,
+            note_id=None,
+        )
+        self._draft_editor.insert_extract(
+            text,
+            anchor,
+            source_code=source_code,
+            page_no=page_no,
+            extract_id=extract_id,
+            rect=pdf_rect,
+        )
+        self._reset_extraction_mode()
+
+    def _on_table_selected(self, source_id: int, page_no: int, pdf_rect: tuple) -> None:
+        if source_id not in self._source_ids:
+            return
+
+        idx = self._source_ids.index(source_id)
+        viewer = self._pdf_viewers[idx]
+        if not viewer.file_path:
+            return
+
+        from core.extraction.normalizers import table_to_markdown
+        from core.extraction.pdf_table import extract_table_from_region
+        from ui.widgets.dialogs.table_preview_dialog import TablePreviewDialog
+
+        rows = extract_table_from_region(viewer.file_path, page_no, pdf_rect)
+        if not rows:
+            QMessageBox.information(self, "Thông tin", "Không phát hiện bảng trong vùng đã chọn.")
+            self._reset_extraction_mode()
+            return
+
+        table_md = table_to_markdown(rows)
+        anchor = self._orchestrator.build_anchor(source_id, page_no, pdf_rect)
+        source_code = self._source_codes[idx] if idx < len(self._source_codes) else None
+
+        dlg = TablePreviewDialog(table_md, anchor, self)
+        if dlg.exec():
+            extract_id = self._orchestrator.commit_extract(
+                source_id=source_id,
+                page_no=page_no,
+                extract_type="table",
+                source_anchor=anchor,
+                content_md=table_md,
+                note_id=None,
+            )
+            self._draft_editor.insert_table(
+                table_md,
+                anchor,
+                source_code=source_code,
+                page_no=page_no,
+                extract_id=extract_id,
+                rect=pdf_rect,
+            )
+
+        self._reset_extraction_mode()
+
+    def _on_image_selected(self, source_id: int, page_no: int, pdf_rect: tuple) -> None:
+        if source_id not in self._source_ids:
+            return
+
+        idx = self._source_ids.index(source_id)
+        viewer = self._pdf_viewers[idx]
+        if not viewer.file_path:
+            return
+
+        from core.extraction.pdf_image import capture_region
+
+        doc = viewer._doc
+        if doc is None:
+            return
+
+        try:
+            img_bytes = capture_region(doc, page_no, pdf_rect)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Lỗi", f"Không thể chụp ảnh:\n{exc}")
+            self._reset_extraction_mode()
+            return
+
+        try:
+            asset_path = self._orchestrator.save_image_asset(source_id, None, img_bytes)
+            self._draft_editor.insert_asset_ref(asset_path, "")
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Lỗi", f"Không thể lưu ảnh:\n{exc}")
+
+        self._reset_extraction_mode()
 
     def _on_source_page_changed(self, source_id: int, page_no: int) -> None:
         try:
@@ -361,6 +567,9 @@ class DraftWorkspaceView(QWidget):
             "Ẩn khung soạn thảo" if self._right_panel.isVisible() else "Hiện khung soạn thảo"
         )
         self._btn_close_all_refs.setEnabled(has_refs)
+        self._btn_extract_text.setEnabled(has_refs)
+        self._btn_extract_table.setEnabled(has_refs)
+        self._btn_capture_image.setEnabled(has_refs)
 
         self._btn_read_focus.setEnabled(has_refs)
         if not has_refs:

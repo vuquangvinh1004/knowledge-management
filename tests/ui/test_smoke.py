@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QWidget
 
 
 # ---------------------------------------------------------------------------
@@ -176,6 +177,21 @@ class TestWorkspaceViewSmoke:
 
 
 class TestDraftWorkspaceViewSmoke:
+    def test_extraction_actions_are_left_group_with_visual_role(self, qtbot):
+        from ui.views.draft_workspace_view import DraftWorkspaceView
+
+        view = DraftWorkspaceView()
+        qtbot.addWidget(view)
+        view.show()
+
+        assert view._btn_extract_text.property("workspaceRole") == "extract-action"
+        assert view._btn_extract_table.property("workspaceRole") == "extract-action"
+        assert view._btn_capture_image.property("workspaceRole") == "extract-action"
+
+        assert view._btn_extract_text.x() < view._btn_new_md.x()
+        assert view._btn_extract_table.x() < view._btn_new_md.x()
+        assert view._btn_capture_image.x() < view._btn_new_md.x()
+
     def test_draft_workspace_does_not_auto_create_ban_nhap_note(self, qtbot, db_session):
         from core.storage.models import Note
         from core.storage.session import get_session
@@ -251,9 +267,15 @@ class TestDraftWorkspaceViewSmoke:
         view = DraftWorkspaceView()
         qtbot.addWidget(view)
         assert not view._btn_toggle_left.isEnabled()
+        assert not view._btn_extract_text.isEnabled()
+        assert not view._btn_extract_table.isEnabled()
+        assert not view._btn_capture_image.isEnabled()
 
         view.open_reference_source(1)
         assert view._btn_toggle_left.isEnabled()
+        assert view._btn_extract_text.isEnabled()
+        assert view._btn_extract_table.isEnabled()
+        assert view._btn_capture_image.isEnabled()
 
     def test_draft_workspace_has_status_label_and_no_top_title(self, qtbot):
         from PySide6.QtWidgets import QLabel
@@ -373,6 +395,17 @@ class TestNoteListEditorTabSmoke:
 
 
 class TestDualPaneHostRecoverySmoke:
+    def test_dual_pane_host_no_longer_shows_extraction_toolbar(self, qtbot):
+        from ui.widgets.dual_pane_host import DualPaneHost
+
+        host = DualPaneHost()
+        qtbot.addWidget(host)
+        extraction_widgets = [
+            widget for widget in host.findChildren(QWidget)
+            if widget.objectName() == "extraction_toolbar"
+        ]
+        assert extraction_widgets == []
+
     def test_shows_recovery_notice_when_note_is_auto_recovered(self, qtbot, monkeypatch, tmp_path):
         from PySide6.QtWidgets import QMessageBox
         from ui.widgets.dual_pane_host import DualPaneHost, PDFViewerWidget
