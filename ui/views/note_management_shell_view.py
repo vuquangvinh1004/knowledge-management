@@ -16,6 +16,7 @@ class NoteScopeTabBar(QTabBar):
         QColor("#C62828"),  # GC Nguồn
         QColor("#2E7D32"),  # GC Khái niệm
         QColor("#1565C0"),  # GC Tổng hợp
+        QColor("#7E57C2"),  # GC Board
     )
 
     def paintEvent(self, _event) -> None:  # noqa: N802
@@ -67,14 +68,17 @@ class NoteManagementShellView(QWidget):
         self._source_workspace = WorkspaceView()
         self._concept_tab = NoteListEditorTab("concept_note")
         self._synthesis_tab = NoteListEditorTab("synthesis_note")
+        self._board_tab = NoteListEditorTab("board_note")
 
         self._tabs.addTab(self._source_workspace, "GC Nguồn")
         self._tabs.addTab(self._concept_tab, "GC Khái niệm")
         self._tabs.addTab(self._synthesis_tab, "GC Tổng hợp")
+        self._tabs.addTab(self._board_tab, "GC Board")
 
         self._source_workspace.library_requested.connect(self.library_requested.emit)
         self._concept_tab.note_deleted.connect(self.note_deleted)
         self._synthesis_tab.note_deleted.connect(self.note_deleted)
+        self._board_tab.note_deleted.connect(self.note_deleted)
 
         layout.addWidget(self._tabs, stretch=1)
 
@@ -88,9 +92,11 @@ class NoteManagementShellView(QWidget):
         self._source_workspace.refresh()
         self._concept_tab.refresh()
         self._synthesis_tab.refresh()
+        self._board_tab.refresh()
 
     def set_project_context(self, project_id: int | None) -> None:
         """Đồng bộ project mode cho các tab liên quan."""
         self._source_workspace.set_project_context(project_id)
         self._concept_tab.set_project_context(project_id)
         self._synthesis_tab.set_project_context(project_id)
+        self._board_tab.set_project_context(project_id)

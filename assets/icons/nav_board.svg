@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" class="nav-icon">
+  <rect x="3.5" y="4" width="17" height="16" rx="2" stroke="currentColor" stroke-width="1.8" class="nav-icon-outline"/>
+  <path d="M3.5 9.5h17M3.5 15h17M9.2 4v16M14.8 4v16" stroke="currentColor" stroke-width="1.8" class="nav-icon-outline"/>
+</svg>

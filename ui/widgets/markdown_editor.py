@@ -1030,12 +1030,18 @@ class MarkdownEditorWidget(QWidget):
         self._known_tags = self._orchestrator.known_tags(self._editor.toPlainText())
 
     def _refresh_known_wikilinks(self) -> None:
-        """Nạp danh sách tiêu đề note cho gợi ý [[wikilink]]."""
+        """Nạp danh sách tiêu đề note cho gợi ý [[wikilink]].
+        
+        Trong scratch mode (no active project), lấy tất cả notes.
+        Trong note mode, lấy notes của active project (excluding current note).
+        """
         self._known_wikilinks = []
         self._wikilink_display_to_title = {}
         if self._notes_dir is None:
             return
         try:
+            # Truyền note_id=None để lấy toàn bộ catalog của project hiện tại
+            # hoặc tất cả notes nếu không có active project
             self._known_wikilinks = self._orchestrator.wikilink_catalog(self._note_id)
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"Không thể nạp wikilink catalog: {exc}")
@@ -1211,7 +1217,7 @@ class MarkdownEditorWidget(QWidget):
         except RuntimeError:
             return
 
-        if self._note_id is None or not self._editor.hasFocus():
+        if not self._editor.hasFocus():
             popup.hide()
             return
 
@@ -1224,7 +1230,7 @@ class MarkdownEditorWidget(QWidget):
         sub_prefix = sub_token.strip().lower()
 
         if mode == "note":
-            # Chế độ gợi ý title note
+            # Chế độ gợi ý title note (hoạt động cả lúc edit note lẫn scratch mode)
             prefix = note_part.strip().lower()
             self._refresh_known_wikilinks()
             matches: list[str] = []

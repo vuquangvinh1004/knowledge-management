@@ -3,7 +3,7 @@
 * **Cấu trúc mẫu:**
 
 $$
-Biểu thức toán #(Số thứ tự)
+\text{Biểu thức toán}
 $$
 
 * **Ví dụ:**
@@ -53,7 +53,7 @@ Kế hoạch làm việc hôm nay:
 * **Ví dụ:**
 Bạn có thể truy cập vào [Trang chủ Google](https://www.google.com) để tìm kiếm thông tin.
 
-# && Align - Căn lề nhiều dòng
+# 5. && Align - Căn lề nhiều dòng
 
 * Dùng ký tự `&` để đánh dấu vị trí cần căn thẳng hàng (thường là dấu bằng) và `\\` để xuống dòng.
 
@@ -73,4 +73,22 @@ $$
     f(x) &= (x + 1)^2 \\
          &= x^2 + 2x + 1
 \end{aligned}
+$$
+
+# 6. $$ Equation $$ - Phương trình toán học
+
+* **Cấu trúc mẫu:**
+$$
+\begin{equation}
+    \text{Phương trình}
+\end{equation}
+$$
+
+
+*   **Ví dụ:**
+Ta có phương trình sau:
+$$
+\begin{equation}
+    a^2 + b^2 = c^2
+\end{equation}
 $$

@@ -142,6 +142,26 @@ class TestDeleteNote:
         service.hard_delete(note.id, delete_file=True)
         assert not file_path.exists()
 
+    def test_hard_delete_note_with_links_does_not_fail(self, service, db_session):
+        from core.services.link_service import LinkService
+        from core.storage.session import get_session
+        from core.storage.models import Link
+
+        target = service.create_note(title="Target", note_type="concept_note")
+        other = service.create_note(title="Other", note_type="concept_note")
+        LinkService().create_link(other.id, target.id, "wikilink")
+
+        service.hard_delete(target.id, delete_file=True)
+
+        with pytest.raises(NoteNotFoundError):
+            service.get_by_id(target.id)
+
+        with get_session() as session:
+            remains = session.query(Link).filter(
+                (Link.from_note_id == target.id) | (Link.to_note_id == target.id)
+            ).count()
+        assert remains == 0
+
 
 class TestNoteMaintenance:
     def test_normalize_source_note_titles_is_idempotent(self, service, db_session, sample_pdf_path):

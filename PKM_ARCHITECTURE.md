@@ -602,6 +602,7 @@ updated_at        TEXT NOT NULL
 ```sql
 id                INTEGER PRIMARY KEY AUTOINCREMENT
 board_id          INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE
+source_note_id    INTEGER REFERENCES notes(id) ON DELETE SET NULL
 label             TEXT NOT NULL
 sort_order        INTEGER NOT NULL DEFAULT 0
 ```
@@ -645,25 +646,21 @@ Quy tắc:
 
 ### 7.4. Board templates chuẩn (Phase 6)
 
-Khi khởi tạo board, người dùng chọn từ 3 template. `BoardService.create_from_template(template_name, title)` tu dong tao cot va board record tuong ung:
+Board phan tich chinh trong tab Bảng nghiên cứu được chot o che do meta-analysis full 34 cot.
+Khong con menu "Khoi tao" trong BoardView; bang se tu dong dam bao full 34 cot va dong bo 1 hang = 1 source_note.
 
 #### Template "Đầy đủ" (meta_analysis — 34 cột)
 
 ID, Ma nghien cuu, Tac gia, Nam, Tieu de, Quoc gia/Boi canh, Loai nguon, Muc tieu nghien cuu, Cau hoi nghien cuu, Ly thuyet/khung phan tich, Chu de chinh, Bien doc lap, Bien phu thuoc, Bien trung gian/dieu tiet, Doi tuong nghien cuu, Co mau, Phuong phap nghien cuu, Cong cu phan tich, Thiet ke nghien cuu, Thang do/chi bao, Ket qua chinh, Huong tac dong, Effect size, Loai effect size, SE/SD, CI thap, CI cao, p-value, Chat luong nghien cuu, Han che, Ghi chu ma hoa, Link source_note, Link concept_note, Link synthesis_note
 
-#### Template "Chỉ tổng hợp tài liệu" (literature — 20 cột)
+`board_note` van la note type hop le nhung duoc tao/quan ly o khu vuc tab note (GC Board), khong tao truc tiep tu BoardView.
 
-ID, Ma nghien cuu, Tac gia, Nam, Tieu de, Quoc gia/Boi canh, Loai nguon, Muc tieu nghien cuu, Cau hoi nghien cuu, Ly thuyet/khung phan tich, Chu de chinh, Bien doc lap, Bien phu thuoc, Phuong phap nghien cuu, Ket qua chinh, Han che, Ghi chu ma hoa, Link source_note, Link concept_note, Link synthesis_note
+**Quy tắc mới của BoardView:**
 
-#### Template "Tạo Board note" (board_note markdown)
-
-Không tạo board table. Tạo một `board_note` moi voi template Markdown chuan gom: Muc dich cua board, Bang nen, Cau truc phan tich, Cac mau hinh noi bat, Nhom/chum noi dung chinh, Khoang trong / diem con thieu, Ham y doi voi he thong note, Ham y doi voi nghien cuu, Ket luan tam thoi.
-
-**Quy tắc gắn board ↔ board_note:**
-
-- Template (i) và (ii): sau khi tạo board, hệ thống hỏi có muốn tạo kèm `board_note` khong; neu co thi ``boards.linked_note_id` = note mới tạo.
-- Template (iii): chỉ tạo note, không tạo board table; ``board_note` có thể gắn vào board sau.
-- Trong `BoardView`, nếu `board.linked_note_id` tồn tại thì hiện nút "Mở Board note".
+- Luon su dung full 34 cot meta-analysis.
+- Moi source_note toi da 1 hang trong cung board (`board_rows.source_note_id` + unique theo `board_id`).
+- BoardView co nut "Dong bo nguon" de cap nhat danh sach hang tu source_note theo scope hien tai.
+- Du lieu legacy (hang/cot cu) duoc giu de tranh mat du lieu, nhung BoardView chi hien thi bo 34 cot chuan va cac hang da gan `source_note_id`.
 
 ---
 
@@ -1233,6 +1230,22 @@ ADDED | GitHub Copilot (GPT-5.3-Codex) | TESTS_UI | Bổ sung smoke test cho ch�
 CHANGED | GitHub Copilot (GPT-5.3-Codex) | UI_WORKFLOW | Chuyển các thao tác `Trích văn bản`, `Trích bảng`, `Chụp ảnh` khỏi `GC Nguồn` sang header của `Không gian làm việc`; workflow mới cho phép trích xuất trực tiếp từ PDF tham khảo và chèn vào scratch markdown editor, trong khi `GC Nguồn` chỉ còn vai trò source note workspace để tránh trùng chức năng.
 
 ADDED | GitHub Copilot (GPT-5.3-Codex) | TESTS_UI | Thêm smoke tests xác nhận các nút trích xuất chỉ enable khi workspace đã mở PDF tham khảo và `DualPaneHost` không còn dựng `extraction_toolbar` trong `GC Nguồn`.
+
+### 2026-05-19
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | BOARD_SCHEMA | `board_rows` bổ sung `source_note_id` (FK notes) + unique theo (`board_id`, `source_note_id`) để hỗ trợ quy tắc 1 hàng = 1 source_note trong tab Bảng nghiên cứu.
+
+Migration Notes | Revision `20260519_0009_add_board_row_source_note_link.py`: thêm cột `board_rows.source_note_id`, index `ix_board_rows_source_note_id`, unique constraint `uq_board_rows_board_source_note`; dữ liệu legacy được giữ nguyên.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | BOARD_WORKFLOW | `BoardView` bỏ menu `Khởi tạo`, cưỡng bức hiển thị bộ 34 cột meta-analysis và thêm hành động `Đồng bộ nguồn` để sync 1 hàng = 1 source_note.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | NOTE_MANAGEMENT | `NoteManagementShellView` thêm thẻ `GC Board` (note_type=`board_note`) để chuyển luồng tạo/quản lý board_note ra khỏi tab Bảng nghiên cứu.
+
+FIXED | GitHub Copilot (GPT-5.3-Codex) | NOTE_DELETE | Sửa lỗi xóa cứng note trong tab GC (đặc biệt GC Khái niệm) khi note còn liên kết trong `links`: `NoteService.hard_delete()` xóa link liên quan trước khi xóa record note để tránh lỗi `NOT NULL constraint failed: links.to_note_id`.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | NOTE_MANAGEMENT_UI | Khi bật `Bao gồm đã xóa`, các note đã soft-delete được tô màu khác trên thanh tab và hiển thị trạng thái rõ ràng để phân biệt với note đang sử dụng.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | BOARD_UI | Tab Bảng nghiên cứu bỏ khung selector phía trên (header + board list), giữ layout tập trung vào bảng tổng hợp.
 
 ### 2026-04-22
 

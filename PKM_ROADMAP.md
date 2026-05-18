@@ -333,6 +333,29 @@ Deliverable: tăng độ bền dữ liệu note và hoàn thiện quản trị n
 
 Deliverable: repo sẵn sàng public với bộ tài liệu quản trị chuẩn, CI cơ bản và hành vi logging minh bạch hơn khi có lỗi runtime.
 
+#### 2026-05-19 — Board Meta-analysis hardening (schema + UI workflow)
+
+| Hạng mục | Trạng thái | Ưu tiên | Ghi chú |
+| --- | --- | --- | --- |
+| Migration 0009: thêm `board_rows.source_note_id` + unique constraint | Done | Cao | Enforce dần quy tắc 1 hàng = 1 source_note |
+| BoardService: luôn đảm bảo full 34 cột meta-analysis | Done | Cao | `ensure_full_meta_columns()` idempotent, giữ dữ liệu legacy |
+| BoardService: đồng bộ hàng theo source_note | Done | Cao | `sync_rows_with_source_notes()` + lọc theo project scope |
+| BoardView: bỏ nút/menu `Khởi tạo` | Done | Cao | Chuyển workflow sang bảng chuẩn hóa |
+| BoardView: thêm hành động `Đồng bộ nguồn` | Done | Cao | Mục tiêu 1 hàng = 1 source_note |
+| Note Management: thêm thẻ `GC Board` | Done | Cao | Tạo/quản lý `board_note` cùng nhóm tab note |
+
+Deliverable: tab Bảng nghiên cứu chuyển sang vai trò ma trận phân tích nguồn chuẩn 34 cột, còn `board_note` được quản lý ở lớp note theo tab riêng.
+
+#### 2026-05-19 — Follow-up fixes (GC Note Delete + Board UI Simplification)
+
+| Hạng mục | Trạng thái | Ưu tiên | Ghi chú |
+| --- | --- | --- | --- |
+| Fix lỗi xóa cứng note còn liên kết (`links`) | Done | Cao | `NoteService.hard_delete()` dọn liên kết trước khi delete note |
+| Phân biệt note đã soft-delete trong tab GC | Done | Trung bình | Tab note đổi màu + tooltip trạng thái khi bật `Bao gồm đã xóa` |
+| Bỏ khung selector phía trên tab Bảng nghiên cứu | Done | Trung bình | BoardView tối giản, tập trung hiển thị bảng tổng hợp |
+
+Deliverable: cải thiện tính ổn định thao tác xóa cứng và trải nghiệm nhận diện trạng thái note/board rõ ràng hơn.
+
 ---
 
 ## 3. Sprint ưu tiên đề xuất

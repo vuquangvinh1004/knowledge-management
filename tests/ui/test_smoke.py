@@ -112,6 +112,39 @@ class TestMainWindowSmoke:
         win.closeEvent(event)
         assert not event.isAccepted()
 
+    def test_sidebar_icon_click_toggles_expand_and_collapse(self, qtbot, db_session, tmp_path, monkeypatch):
+        from config.settings import AppSettings
+        import ui.main_window as main_window_module
+
+        test_settings = AppSettings(path=tmp_path / "settings_sidebar_toggle.json")
+        test_settings.set("sidebar_collapsed", True)
+        test_settings.save()
+        monkeypatch.setattr(main_window_module, "get_settings", lambda: test_settings)
+
+        win = main_window_module.MainWindow()
+        qtbot.addWidget(win)
+
+        assert win._sidebar.is_collapsed()
+        qtbot.mouseClick(win._sidebar._buttons[0], Qt.MouseButton.LeftButton)
+        assert not win._sidebar.is_collapsed()
+        assert test_settings.get("sidebar_collapsed") is False
+
+        qtbot.mouseClick(win._sidebar._buttons[0], Qt.MouseButton.LeftButton)
+        assert win._sidebar.is_collapsed()
+        assert test_settings.get("sidebar_collapsed") is True
+
+    def test_sidebar_click_other_tab_keeps_expanded(self, qtbot, db_session):
+        from ui.main_window import MainWindow, NAV_LIBRARY
+
+        win = MainWindow()
+        qtbot.addWidget(win)
+        win._sidebar.set_collapsed(False)
+        win._sidebar.set_active(0)
+
+        qtbot.mouseClick(win._sidebar._buttons[NAV_LIBRARY], Qt.MouseButton.LeftButton)
+        assert win._stack.currentIndex() == NAV_LIBRARY
+        assert not win._sidebar.is_collapsed()
+
 
 # ---------------------------------------------------------------------------
 # DashboardView smoke test
@@ -499,6 +532,33 @@ class TestNoteListEditorTabSmoke:
         assert tab._btn_delete.isEnabled()
         assert tab._btn_hard_delete.isEnabled()
 
+    def test_soft_deleted_note_tab_has_distinct_color(self, qtbot, db_session, tmp_path, monkeypatch):
+        from ui.widgets import note_list_editor_tab as note_tab_module
+
+        notes_dir = tmp_path / "notes"
+        assets_dir = tmp_path / "assets"
+        notes_dir.mkdir()
+        assets_dir.mkdir()
+        monkeypatch.setattr(note_tab_module, "NOTES_DIR", notes_dir)
+        monkeypatch.setattr(note_tab_module, "ASSETS_DIR", assets_dir)
+
+        svc = note_tab_module.NoteService(notes_dir)
+        note = svc.create_note("Khái niệm đã xóa", "concept_note")
+        svc.soft_delete(note.id)
+
+        tab = note_tab_module.NoteListEditorTab("concept_note")
+        qtbot.addWidget(tab)
+        tab._chk_include_deleted.setChecked(True)
+        tab.refresh()
+
+        deleted_index = next(
+            i
+            for i, nid in enumerate(tab._tab_note_ids)
+            if nid is not None and int(nid) == int(note.id)
+        )
+        color = tab._doc_tabs.tabTextColor(deleted_index)
+        assert color.isValid()
+
 
 class TestDualPaneHostRecoverySmoke:
     def test_dual_pane_host_no_longer_shows_extraction_toolbar(self, qtbot):
@@ -715,9 +775,7 @@ class TestBoardViewSmoke:
         qtbot.addWidget(view)
         assert view is not None
         assert hasattr(view, "_btn_graph_view")
-        assert hasattr(view, "_board_selector")
-        assert hasattr(view, "_btn_init")
-        assert hasattr(view, "_btn_open_board_note")
+        assert hasattr(view, "_btn_add_row")
 
     def test_empty_board_shows_empty_state(self, qtbot, db_session):
         from ui.views.board_view import BoardView
@@ -728,34 +786,49 @@ class TestBoardViewSmoke:
 
     def test_board_with_rows_hides_empty_state(self, qtbot, db_session):
         from ui.views.board_view import BoardView
-        from core.services.board_service import BoardService
-        svc = BoardService()
-        svc.create_row("Row Smoke")
-        svc.create_column("Col Smoke")
+        from datetime import datetime, timezone
+
+        from config.paths import NOTES_DIR
+        from core.services.note_service import NoteService
+        from core.storage.models import Source
+        from core.storage.session import get_session
+
+        with get_session() as session:
+            source = Source(
+                file_path="D:/fake-board-smoke.pdf",
+                file_hash="board_smoke_hash",
+                title="Board Smoke Source",
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
+            )
+            session.add(source)
+            session.flush()
+            source_id = int(source.id)
+
+        NoteService(NOTES_DIR).create_note("source - Board Smoke", "source_note", source_id)
+
         view = BoardView()
         qtbot.addWidget(view)
         view.refresh()
         assert view._empty_state.isHidden()
         assert not view._table.isHidden()
+        assert len(view._cols) == 34
+        assert all(getattr(r, "source_note_id", None) is not None for r in view._rows)
+        assert view._table.rowCount() == len(view._cols)
+        assert view._table.columnCount() == len(view._rows)
 
-    def test_board_selector_switches_active_board(self, qtbot, db_session):
+    def test_board_uses_default_board_when_no_active_board(self, qtbot, db_session):
         from ui.views.board_view import BoardView
         from core.services.board_service import BoardService
 
         svc = BoardService()
-        b1 = svc.create_board("Board Smoke A")
-        b2 = svc.create_board("Board Smoke B")
-        svc.create_row("A-row", board_id=b1.id)
-        svc.create_column("A-col", board_id=b1.id)
-        svc.create_row("B-row", board_id=b2.id)
-        svc.create_column("B-col", board_id=b2.id)
+        default_board = svc.get_default_board()
 
         view = BoardView()
         qtbot.addWidget(view)
         view.refresh()
-        view._on_board_selected(b2.id)
-        assert view._active_board_id == b2.id
-        assert any(r.label == "B-row" for r in view._rows)
+        assert view._active_board_id == default_board.id
+        assert len(view._cols) == 34
 
 
 # ---------------------------------------------------------------------------

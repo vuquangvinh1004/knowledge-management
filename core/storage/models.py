@@ -122,6 +122,7 @@ class Note(Base):
         "Link", foreign_keys="Link.to_note_id", back_populates="to_note", lazy="select"
     )
     board_cells = relationship("BoardCell", back_populates="linked_note", lazy="select")
+    board_rows = relationship("BoardRow", back_populates="source_note", lazy="select")
     linked_boards = relationship("Board", back_populates="linked_note", lazy="select")
     project = relationship("Project", back_populates="own_notes", lazy="select")
     project_refs = relationship("ProjectNoteRef", back_populates="note", cascade="all, delete-orphan")
@@ -265,13 +266,16 @@ class BoardRow(Base):
     """Hàng của Research Board (thường là source hoặc chủ đề)."""
 
     __tablename__ = "board_rows"
+    __table_args__ = (UniqueConstraint("board_id", "source_note_id", name="uq_board_rows_board_source_note"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     board_id = Column(Integer, ForeignKey("boards.id", ondelete="CASCADE"), nullable=False)
+    source_note_id = Column(Integer, ForeignKey("notes.id", ondelete="SET NULL"), nullable=True)
     label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
 
     board = relationship("Board", back_populates="rows")
+    source_note = relationship("Note", back_populates="board_rows", foreign_keys=[source_note_id])
     cells = relationship("BoardCell", back_populates="row", cascade="all, delete-orphan")
 
 

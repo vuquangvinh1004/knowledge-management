@@ -209,6 +209,71 @@ class TestBoardTemplates:
         assert note_id is not None
 
 
+class TestBoardSourceNoteSync:
+    def test_ensure_full_meta_columns_returns_34(self, board_service):
+        cols = board_service.ensure_full_meta_columns()
+        assert len(cols) == 34
+
+    def test_sync_rows_with_source_notes_creates_linked_rows(self, board_service, notes_dir):
+        from datetime import datetime, timezone
+
+        from core.services.note_service import NoteService
+        from core.storage.models import Source
+        from core.storage.session import get_session
+
+        with get_session() as session:
+            src = Source(
+                file_path="D:/sync-source.pdf",
+                file_hash="sync_source_hash",
+                title="Sync Source",
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
+            )
+            session.add(src)
+            session.flush()
+            source_id = int(src.id)
+
+        note = NoteService(notes_dir).create_note(
+            title="source - Sync Source",
+            note_type="source_note",
+            source_id=source_id,
+        )
+
+        rows = board_service.sync_rows_with_source_notes()
+        assert any(int(r.source_note_id or 0) == int(note.id) for r in rows)
+
+    def test_list_source_note_rows_only_returns_linked_rows(self, board_service, notes_dir):
+        from datetime import datetime, timezone
+
+        from core.services.note_service import NoteService
+        from core.storage.models import Source
+        from core.storage.session import get_session
+
+        with get_session() as session:
+            src = Source(
+                file_path="D:/linked-only-source.pdf",
+                file_hash="linked_only_source_hash",
+                title="Linked Only",
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
+            )
+            session.add(src)
+            session.flush()
+            source_id = int(src.id)
+
+        note = NoteService(notes_dir).create_note(
+            title="source - Linked Only",
+            note_type="source_note",
+            source_id=source_id,
+        )
+
+        board_service.create_row("Legacy Row")
+        board_service.sync_rows_with_source_notes()
+        rows = board_service.list_source_note_rows()
+        assert all(r.source_note_id is not None for r in rows)
+        assert any(int(r.source_note_id or 0) == int(note.id) for r in rows)
+
+
 class TestBoardExport:
     def test_export_markdown_empty(self, board_service):
         md = board_service.export_markdown()

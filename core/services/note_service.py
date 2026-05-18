@@ -450,6 +450,13 @@ class NoteService:
             if note is None:
                 raise NoteNotFoundError(f"Không tìm thấy note id={note_id}.")
             file_path = Path(note.file_path)
+
+            # Xóa links tham chiếu trước để tránh ORM cố set FK về NULL
+            # trong khi links.to_note_id / links.from_note_id là NOT NULL.
+            session.query(Link).filter(
+                (Link.from_note_id == note_id) | (Link.to_note_id == note_id)
+            ).delete(synchronize_session=False)
+
             session.delete(note)
 
         if delete_file and file_path.exists():

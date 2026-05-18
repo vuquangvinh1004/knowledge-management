@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -159,9 +160,15 @@ class NoteListEditorTab(QWidget):
 
         for note in self._filtered_rows:
             title = (note.title or "(không tiêu đề)").strip()
-            tab_text = title if len(title) <= 28 else f"{title[:27]}..."
+            is_deleted = bool(getattr(note, "is_deleted", 0))
+            visible_title = f"[Đã xóa] {title}" if is_deleted else title
+            tab_text = visible_title if len(visible_title) <= 28 else f"{visible_title[:27]}..."
             idx = self._doc_tabs.addTab(tab_text)
-            self._doc_tabs.setTabToolTip(idx, f"ID {note.id} | {title}")
+            state_text = "ĐÃ XÓA MỀM" if is_deleted else "ĐANG SỬ DỤNG"
+            self._doc_tabs.setTabToolTip(idx, f"ID {note.id} | {title} | {state_text}")
+            if is_deleted:
+                # Tông vàng sáng giúp tương phản tốt trên nền tab xanh lá/xanh dương.
+                self._doc_tabs.setTabTextColor(idx, QColor("#FFF59D"))
             self._tab_note_ids.append(int(note.id))
 
         create_idx = self._doc_tabs.addTab("Tạo note mới")
@@ -287,8 +294,21 @@ class NoteListEditorTab(QWidget):
             self._btn_hard_delete.setEnabled(False)
             return
 
-        self._btn_delete.setEnabled(True)
+        note_row = next((n for n in self._filtered_rows if int(n.id) == int(note_id)), None)
+        is_deleted = bool(getattr(note_row, "is_deleted", 0)) if note_row is not None else False
+
+        self._btn_delete.setEnabled(not is_deleted)
         self._btn_hard_delete.setEnabled(True)
+
+        if is_deleted:
+            title = str(getattr(note_row, "title", "Ghi chú") or "Ghi chú")
+            self._editor.enable_scratch_mode(f"{title} (đã xóa mềm)")
+            self._editor.set_markdown_content(
+                "Ghi chú này đã bị xóa mềm.\n"
+                "Bạn có thể dùng nút 'Xóa cứng' để xóa hoàn toàn khỏi hệ thống."
+            )
+            return
+
         try:
             self._editor.load_note(int(note_id), NOTES_DIR)
         except Exception as exc:  # noqa: BLE001

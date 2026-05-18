@@ -34,6 +34,7 @@ _DEFAULTS: dict[str, Any] = {
     "window_height": 800,
     "window_maximized": False,
     "sidebar_width": 220,
+    "sidebar_collapsed": True,
     "dual_pane_split": 0.5,
     "theme": "light",
     "last_opened_sources": [],

@@ -122,6 +122,10 @@ QWidget#sidebar_widget {
     border-right: 1px solid #D0D4E8;
 }
 
+QWidget#sidebar_widget[collapsed="true"] {
+    border-right: 1px solid #D0D4E8;
+}
+
 QLabel#sidebar_section_header {
     font-size: 11px;
     font-weight: 700;
@@ -130,9 +134,10 @@ QLabel#sidebar_section_header {
     letter-spacing: 0.06em;
 }
 
-QPushButton[flat="true"] {
+QWidget#sidebar_widget QPushButton#sidebar_nav_button {
     text-align: left;
-    padding: 8px 16px;
+    padding: 8px 12px;
+    padding-left: 12px;
     font-size: 13px;
     color: #333333;
     border: none;
@@ -140,17 +145,34 @@ QPushButton[flat="true"] {
     background-color: transparent;
 }
 
-QPushButton[flat="true"]:hover {
+QWidget#sidebar_widget QPushButton#sidebar_nav_button:hover {
     background-color: #E9EDFB;
     color: #1A1A2E;
 }
 
-QPushButton[flat="true"]:checked {
+QWidget#sidebar_widget QPushButton#sidebar_nav_button:checked {
     background-color: #E5EEFF;
     color: #1E40AF;
     font-weight: 700;
     border-left: 3px solid #3A5CE6;
     padding-left: 13px;
+}
+
+QWidget#sidebar_widget QPushButton#sidebar_nav_button:checked {
+    color: #1E40AF;
+}
+
+QWidget#sidebar_widget[collapsed="true"] QPushButton#sidebar_nav_button {
+    text-align: left;
+    padding: 8px 0px;
+    padding-left: 14px;
+}
+
+QWidget#sidebar_widget[collapsed="true"] QPushButton#sidebar_nav_button:checked {
+    border-left: none;
+    border-right: 3px solid #3A5CE6;
+    padding-left: 14px;
+    padding-right: 0px;
 }
 
 QListWidget#sidebar_project_list {

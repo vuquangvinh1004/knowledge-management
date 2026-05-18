@@ -87,6 +87,11 @@ class MainWindow(QMainWindow):
         layout.setSpacing(0)
 
         self._sidebar = SidebarWidget()
+        self._sidebar.set_collapsed(
+            bool(self._settings.get("sidebar_collapsed", True)),
+            emit_signal=False,
+            animate=False,
+        )
         layout.addWidget(self._sidebar)
 
         self._stack = QStackedWidget()
@@ -114,6 +119,7 @@ class MainWindow(QMainWindow):
 
     def _connect_signals(self) -> None:
         self._sidebar.navigation_requested.connect(self._navigate_to)
+        self._sidebar.collapsed_changed.connect(self._on_sidebar_collapsed_changed)
         self._sidebar.project_activate_requested.connect(self._on_sidebar_project_activate_requested)
         self._sidebar.project_manager_requested.connect(self._open_project_manager_dialog)
 
@@ -153,6 +159,11 @@ class MainWindow(QMainWindow):
     def _on_sidebar_project_activate_requested(self, project_id: object) -> None:
         """Kích hoạt project từ sidebar, hoặc về Global mode nếu project_id=None."""
         mwh.activate_project_from_sidebar(self, project_id)
+
+    def _on_sidebar_collapsed_changed(self, collapsed: bool) -> None:
+        """Lưu preference thu gọn sidebar ngay khi người dùng đổi trạng thái."""
+        self._settings.set("sidebar_collapsed", bool(collapsed))
+        self._settings.save()
 
     # ------------------------------------------------------------------
     # Navigation
@@ -250,6 +261,7 @@ class MainWindow(QMainWindow):
         if not self.isMaximized():
             self._settings.set("window_width", self.width())
             self._settings.set("window_height", self.height())
+        self._settings.set("sidebar_collapsed", self._sidebar.is_collapsed())
         self._settings.set("window_maximized", self.isMaximized())
         self._settings.save()
         super().closeEvent(event)

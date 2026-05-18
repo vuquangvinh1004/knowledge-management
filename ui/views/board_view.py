@@ -10,8 +10,6 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
-    QInputDialog,
-    QLabel,
     QMenu,
     QMessageBox,
     QPlainTextEdit,
@@ -20,13 +18,11 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QToolBar,
-    QToolButton,
     QVBoxLayout,
     QWidget,
     QHeaderView,
 )
 
-from ui.widgets.board_selector_panel import BoardSelectorPanel
 from ui.widgets.empty_state import EmptyStateWidget
 from core.utils.logger import get_logger
 
@@ -68,6 +64,7 @@ class BoardView(QWidget):
         self._rows: list = []   # list[BoardRow]
         self._cols: list = []   # list[BoardColumn]
         self._active_board_id: int | None = None
+        self._project_id: int | None = None
         self._build_ui()
 
     # ------------------------------------------------------------------
@@ -79,48 +76,14 @@ class BoardView(QWidget):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(8)
 
-        header = QLabel("Bảng nghiên cứu")
-        header.setObjectName("view_header")
-        layout.addWidget(header)
-
-        self._board_selector = BoardSelectorPanel(self)
-        self._board_selector.board_selected.connect(self._on_board_selected)
-        layout.addWidget(self._board_selector)
-
         # Toolbar
         toolbar = QToolBar()
         toolbar.setMovable(False)
 
-        self._btn_add_row = QPushButton("+ Hàng")
-        self._btn_add_row.setToolTip("Thêm hàng mới")
-        self._btn_add_row.clicked.connect(self._add_row)
+        self._btn_add_row = QPushButton("Đồng bộ nguồn")
+        self._btn_add_row.setToolTip("Đồng bộ 1 hàng = 1 source_note cho board hiện tại")
+        self._btn_add_row.clicked.connect(self._sync_source_rows)
         toolbar.addWidget(self._btn_add_row)
-
-        self._btn_add_col = QPushButton("+ Cột")
-        self._btn_add_col.setToolTip("Thêm cột mới")
-        self._btn_add_col.clicked.connect(self._add_col)
-        toolbar.addWidget(self._btn_add_col)
-
-        self._btn_init = QToolButton()
-        self._btn_init.setText("Khởi tạo")
-        self._btn_init.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        init_menu = QMenu(self._btn_init)
-        self._act_init_meta = init_menu.addAction("(i) Đầy đủ (34 cột)")
-        self._act_init_lit = init_menu.addAction("(ii) Chỉ tổng hợp tài liệu (20 cột)")
-        self._act_init_note = init_menu.addAction("(iii) Tạo Board note")
-        self._act_init_meta.triggered.connect(self._init_template_meta_analysis)
-        self._act_init_lit.triggered.connect(self._init_template_literature)
-        self._act_init_note.triggered.connect(self._init_template_board_note_only)
-        self._btn_init.setMenu(init_menu)
-        toolbar.addWidget(self._btn_init)
-
-        toolbar.addSeparator()
-
-        self._btn_open_board_note = QPushButton("Mở Board note")
-        self._btn_open_board_note.setToolTip("Mở note tổng hợp gắn với board hiện tại")
-        self._btn_open_board_note.clicked.connect(self._open_linked_board_note)
-        self._btn_open_board_note.setVisible(False)
-        toolbar.addWidget(self._btn_open_board_note)
 
         toolbar.addSeparator()
 
@@ -142,11 +105,11 @@ class BoardView(QWidget):
 
         # Empty state
         self._empty_state = EmptyStateWidget(
-            "Chưa có board nào.\nThêm hàng và cột để bắt đầu tổng hợp nghiên cứu.",
-            action_label="Thêm hàng đầu tiên",
+            "Chưa có source_note để tổng hợp.\nHãy thêm nguồn PDF và tạo source_note trước.",
+            action_label="Đồng bộ source_note",
         )
         if self._empty_state.action_button:
-            self._empty_state.action_button.clicked.connect(self._add_row)
+            self._empty_state.action_button.clicked.connect(self._sync_source_rows)
         layout.addWidget(self._empty_state)
 
         # Table widget
@@ -178,24 +141,22 @@ class BoardView(QWidget):
     def refresh(self) -> None:
         """Tải lại dữ liệu board từ DB."""
         svc = self._get_service()
-        boards = svc.list_boards()
-        if not boards:
-            default_board = svc.get_default_board()
-            boards = [default_board]
+        if self._active_board_id is None:
+            self._active_board_id = svc.get_default_board().id
+        else:
+            try:
+                svc.get_board(self._active_board_id)
+            except Exception:
+                self._active_board_id = svc.get_default_board().id
 
-        if self._active_board_id is None or all(b.id != self._active_board_id for b in boards):
-            self._active_board_id = boards[0].id
+        self._cols = svc.ensure_full_meta_columns(board_id=self._active_board_id)
+        self._rows = svc.sync_rows_with_source_notes(
+            board_id=self._active_board_id,
+            project_id=self._project_id,
+        )
 
-        self._board_selector.refresh(boards, active_board_id=self._active_board_id)
-        self._rows = svc.list_rows(board_id=self._active_board_id)
-        self._cols = svc.list_columns(board_id=self._active_board_id)
         self._rebuild_table()
         self._update_visibility()
-        self._refresh_board_note_button()
-
-    def _on_board_selected(self, board_id: int) -> None:
-        self._active_board_id = board_id
-        self.refresh()
 
     def showEvent(self, event) -> None:  # type: ignore[override]
         super().showEvent(event)
@@ -204,147 +165,69 @@ class BoardView(QWidget):
     def _rebuild_table(self) -> None:
         """Dựng lại QTableWidget từ rows/cols/cells."""
         svc = self._get_service()
-        self._table.setRowCount(len(self._rows))
-        self._table.setColumnCount(len(self._cols))
+        # Hiển thị transpose:
+        # - source_note rows -> cột ngang
+        # - tiêu chí (columns) -> hàng dọc bên trái
+        self._table.setRowCount(len(self._cols))
+        self._table.setColumnCount(len(self._rows))
 
         # Headers
-        self._table.setHorizontalHeaderLabels([c.label for c in self._cols])
-        self._table.setVerticalHeaderLabels([r.label for r in self._rows])
+        self._table.setHorizontalHeaderLabels([r.label for r in self._rows])
+        self._table.setVerticalHeaderLabels([c.label for c in self._cols])
 
         # Fill cells
         cells_map: dict[tuple[int, int], str] = {}
         for cell in svc.get_all_cells(board_id=self._active_board_id):
             cells_map[(cell.row_id, cell.col_id)] = cell.content_md or ""
 
-        for ri, row in enumerate(self._rows):
-            for ci, col in enumerate(self._cols):
+        for ri, col in enumerate(self._cols):
+            for ci, row in enumerate(self._rows):
                 content = cells_map.get((row.id, col.id), "")
                 item = QTableWidgetItem(content[:80] + ("…" if len(content) > 80 else ""))
                 item.setToolTip(content)
                 self._table.setItem(ri, ci, item)
 
-        header = self._table.horizontalHeader()
-        if len(self._cols) >= 20:
-            # Board lớn ưu tiên điều khiển thủ công và scroll ngang ổn định.
-            header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-            header.setDefaultSectionSize(180)
-        else:
-            self._table.resizeColumnsToContents()
+        h_header = self._table.horizontalHeader()
+        h_header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        h_header.setDefaultSectionSize(220)
+
+        v_header = self._table.verticalHeader()
+        v_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        v_header.setMinimumSectionSize(24)
+        self._table.verticalHeader().setFixedWidth(250)
 
     def _update_visibility(self) -> None:
-        has_data = bool(self._rows) or bool(self._cols)
+        has_data = bool(self._rows)
         self._empty_state.setVisible(not has_data)
-        self._table.setVisible(has_data)
-        self._btn_export_md.setEnabled(has_data)
-        self._btn_export_csv.setEnabled(has_data)
+        self._table.setVisible(True)
+        self._btn_export_md.setEnabled(bool(self._rows))
+        self._btn_export_csv.setEnabled(bool(self._rows))
 
-    def _refresh_board_note_button(self) -> None:
-        if self._active_board_id is None:
-            self._btn_open_board_note.setVisible(False)
-            self._btn_open_board_note.setEnabled(False)
-            return
-        try:
-            board = self._get_service().get_board(self._active_board_id)
-            has_linked = board.linked_note_id is not None
-        except Exception:
-            has_linked = False
-        self._btn_open_board_note.setVisible(has_linked)
-        self._btn_open_board_note.setEnabled(has_linked)
-
-    def _init_template_meta_analysis(self) -> None:
-        self._init_board_from_template("meta_analysis", "Meta-analysis Board")
-
-    def _init_template_literature(self) -> None:
-        self._init_board_from_template("literature", "Literature Review Board")
-
-    def _init_board_from_template(self, template_name: str, default_title: str) -> None:
-        title, ok = QInputDialog.getText(self, "Khởi tạo board", "Tên board:", text=default_title)
-        if not ok or not title.strip():
-            return
-
-        create_note = QMessageBox.question(
-            self,
-            "Tạo Board note",
-            "Bạn có muốn tạo kèm board_note cho board này không?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        ) == QMessageBox.StandardButton.Yes
-
-        try:
-            from config.paths import NOTES_DIR
-
-            board, linked_note_id = self._get_service().create_from_template(
-                template_name,
-                title.strip(),
-                notes_dir=NOTES_DIR,
-                create_linked_board_note=create_note,
-            )
-            if board is not None:
-                self._active_board_id = board.id
-                self.refresh()
-            if linked_note_id:
-                QMessageBox.information(self, "Hoàn tất", "Đã tạo board và board_note liên kết.")
-            else:
-                QMessageBox.information(self, "Hoàn tất", "Đã khởi tạo board từ template.")
-        except Exception as exc:
-            QMessageBox.warning(self, "Lỗi khởi tạo", str(exc))
-
-    def _init_template_board_note_only(self) -> None:
-        title, ok = QInputDialog.getText(
-            self,
-            "Tạo Board note",
-            "Tiêu đề board_note:",
-            text="board tổng hợp mới",
-        )
-        if not ok or not title.strip():
-            return
-        try:
-            from config.paths import NOTES_DIR
-
-            _, note_id = self._get_service().create_from_template(
-                "board_note",
-                title.strip(),
-                notes_dir=NOTES_DIR,
-            )
-            if note_id is not None:
-                self.note_open_requested.emit(note_id)
-        except Exception as exc:
-            QMessageBox.warning(self, "Lỗi tạo note", str(exc))
-
-    def _open_linked_board_note(self) -> None:
-        if self._active_board_id is None:
-            return
-        try:
-            board = self._get_service().get_board(self._active_board_id)
-        except Exception:
-            return
-        if board.linked_note_id is not None:
-            self.note_open_requested.emit(board.linked_note_id)
+    def set_project_context(self, project_id: int | None) -> None:
+        """Áp dụng project scope để đồng bộ source_note theo ngữ cảnh hiện tại."""
+        self._project_id = project_id
+        self.refresh()
 
     # ------------------------------------------------------------------
     # Add row / col
     # ------------------------------------------------------------------
 
-    def _add_row(self) -> None:
-        label, ok = QInputDialog.getText(self, "Thêm hàng", "Tên hàng:")
-        if ok and label.strip():
-            self._get_service().create_row(label.strip(), board_id=self._active_board_id)
-            self.refresh()
-
-    def _add_col(self) -> None:
-        label, ok = QInputDialog.getText(self, "Thêm cột", "Tên cột:")
-        if ok and label.strip():
-            self._get_service().create_column(label.strip(), board_id=self._active_board_id)
-            self.refresh()
+    def _sync_source_rows(self) -> None:
+        self._get_service().sync_rows_with_source_notes(
+            board_id=self._active_board_id,
+            project_id=self._project_id,
+        )
+        self.refresh()
 
     # ------------------------------------------------------------------
     # Cell edit
     # ------------------------------------------------------------------
 
     def _on_cell_double_clicked(self, row_idx: int, col_idx: int) -> None:
-        if row_idx >= len(self._rows) or col_idx >= len(self._cols):
+        if row_idx >= len(self._cols) or col_idx >= len(self._rows):
             return
-        row = self._rows[row_idx]
-        col = self._cols[col_idx]
+        col = self._cols[row_idx]
+        row = self._rows[col_idx]
 
         svc = self._get_service()
         existing_cell = svc.get_cell(row.id, col.id, board_id=self._active_board_id)
@@ -366,68 +249,14 @@ class BoardView(QWidget):
 
     def _show_context_menu(self, pos) -> None:
         menu = QMenu(self)
-        action_rename_row = menu.addAction("Đổi tên hàng")
-        action_rename_col = menu.addAction("Đổi tên cột")
-        menu.addSeparator()
-        action_del_row = menu.addAction("Xóa hàng")
-        action_del_col = menu.addAction("Xóa cột")
+        action_sync_rows = menu.addAction("Đồng bộ lại từ source_note")
 
         action = menu.exec(self._table.viewport().mapToGlobal(pos))
         if not action:
             return
 
-        idx = self._table.currentIndex()
-        ri, ci = idx.row(), idx.column()
-
-        if action == action_rename_row and ri < len(self._rows):
-            row = self._rows[ri]
-            new_label, ok = QInputDialog.getText(
-                self, "Đổi tên hàng", "Tên mới:", text=row.label
-            )
-            if ok and new_label.strip():
-                self._get_service().rename_row(
-                    row.id,
-                    new_label.strip(),
-                    board_id=self._active_board_id,
-                )
-                self.refresh()
-
-        elif action == action_rename_col and ci < len(self._cols):
-            col = self._cols[ci]
-            new_label, ok = QInputDialog.getText(
-                self, "Đổi tên cột", "Tên mới:", text=col.label
-            )
-            if ok and new_label.strip():
-                self._get_service().rename_column(
-                    col.id,
-                    new_label.strip(),
-                    board_id=self._active_board_id,
-                )
-                self.refresh()
-
-        elif action == action_del_row and ri < len(self._rows):
-            row = self._rows[ri]
-            reply = QMessageBox.question(
-                self,
-                "Xóa hàng",
-                f"Xóa hàng '{row.label}' và toàn bộ nội dung?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            if reply == QMessageBox.StandardButton.Yes:
-                self._get_service().delete_row(row.id, board_id=self._active_board_id)
-                self.refresh()
-
-        elif action == action_del_col and ci < len(self._cols):
-            col = self._cols[ci]
-            reply = QMessageBox.question(
-                self,
-                "Xóa cột",
-                f"Xóa cột '{col.label}' và toàn bộ nội dung?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            if reply == QMessageBox.StandardButton.Yes:
-                self._get_service().delete_column(col.id, board_id=self._active_board_id)
-                self.refresh()
+        if action == action_sync_rows:
+            self._sync_source_rows()
 
     # ------------------------------------------------------------------
     # Export

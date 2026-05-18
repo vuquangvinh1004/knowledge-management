@@ -99,6 +99,7 @@ def apply_project_context(window: Any, project_id: int | None) -> None:
     window._library_view.set_project_context(project_id)
     window._workspace_view.set_project_context(project_id)
     window._note_management_view.set_project_context(project_id)
+    window._board_view.set_project_context(project_id)
     window._dashboard_view.refresh()
 
 

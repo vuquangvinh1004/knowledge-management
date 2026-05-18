@@ -11,7 +11,7 @@ import io
 from datetime import datetime, timezone
 from pathlib import Path
 
-from core.storage.models import Board, BoardCell, BoardColumn, BoardRow
+from core.storage.models import Board, BoardCell, BoardColumn, BoardRow, Note
 from core.storage.session import get_session
 from core.utils.exceptions import PKMError
 from core.utils.logger import get_logger
@@ -239,6 +239,134 @@ class BoardService:
             return board_id
         return self.get_default_board().id
 
+    def ensure_full_meta_columns(self, board_id: int | None = None) -> list[BoardColumn]:
+        """Đảm bảo board có đủ bộ cột meta-analysis 34 cột theo thứ tự chuẩn.
+
+        Ghi chú: không xóa cột legacy để tránh mất dữ liệu cũ; UI sẽ chỉ dùng bộ 34 cột chuẩn.
+        """
+        resolved_board_id = self._resolve_board_id(board_id)
+        with get_session() as session:
+            existing = (
+                session.query(BoardColumn)
+                .filter(BoardColumn.board_id == resolved_board_id)
+                .order_by(BoardColumn.sort_order, BoardColumn.id)
+                .all()
+            )
+            by_label: dict[str, BoardColumn] = {str(col.label): col for col in existing}
+
+            for idx, label in enumerate(META_ANALYSIS_COLUMNS):
+                col = by_label.get(label)
+                if col is None:
+                    col = BoardColumn(board_id=resolved_board_id, label=label, sort_order=idx)
+                    session.add(col)
+                else:
+                    col.sort_order = idx
+
+            board = session.get(Board, resolved_board_id)
+            if board:
+                board.board_type = "meta_analysis"
+                board.updated_at = datetime.now(timezone.utc)
+
+            session.flush()
+            cols = (
+                session.query(BoardColumn)
+                .filter(
+                    BoardColumn.board_id == resolved_board_id,
+                    BoardColumn.label.in_(META_ANALYSIS_COLUMNS),
+                )
+                .order_by(BoardColumn.sort_order, BoardColumn.id)
+                .all()
+            )
+            for c in cols:
+                session.expunge(c)
+            return cols
+
+    def sync_rows_with_source_notes(
+        self,
+        board_id: int | None = None,
+        *,
+        project_id: int | None = None,
+    ) -> list[BoardRow]:
+        """Đồng bộ hàng board theo source_note (1 hàng = 1 source_note).
+
+        Không xóa hàng legacy không gắn source_note để tránh mất dữ liệu cũ.
+        """
+        from config.paths import NOTES_DIR
+        from core.services.note_service import NoteService
+        from core.services.project_service import ProjectService
+
+        resolved_board_id = self._resolve_board_id(board_id)
+
+        note_svc = NoteService(NOTES_DIR)
+        notes = note_svc.list_all(note_type="source_note", include_deleted=False)
+
+        if project_id is not None:
+            allowed = ProjectService().get_project_note_ids(project_id)
+            notes = [n for n in notes if int(n.id) in allowed]
+
+        notes = sorted(notes, key=lambda n: str(n.title or "").lower())
+
+        with get_session() as session:
+            rows = (
+                session.query(BoardRow)
+                .filter(BoardRow.board_id == resolved_board_id)
+                .all()
+            )
+            by_source_note_id = {
+                int(r.source_note_id): r
+                for r in rows
+                if isinstance(r.source_note_id, int)
+            }
+
+            for idx, note in enumerate(notes):
+                row = by_source_note_id.get(int(note.id))
+                if row is None:
+                    row = BoardRow(
+                        board_id=resolved_board_id,
+                        source_note_id=int(note.id),
+                        label=str(note.title or f"source_note {note.id}"),
+                        sort_order=idx,
+                    )
+                    session.add(row)
+                else:
+                    row.label = str(note.title or row.label)
+                    row.sort_order = idx
+
+            board = session.get(Board, resolved_board_id)
+            if board:
+                board.updated_at = datetime.now(timezone.utc)
+
+            session.flush()
+            linked_rows = (
+                session.query(BoardRow)
+                .filter(
+                    BoardRow.board_id == resolved_board_id,
+                    BoardRow.source_note_id.is_not(None),
+                )
+                .order_by(BoardRow.sort_order, BoardRow.id)
+                .all()
+            )
+            for r in linked_rows:
+                session.expunge(r)
+            return linked_rows
+
+    def list_source_note_rows(self, board_id: int | None = None) -> list[BoardRow]:
+        """Liệt kê hàng đã gắn source_note cho board hiện tại."""
+        resolved_board_id = self._resolve_board_id(board_id)
+        with get_session() as session:
+            rows = (
+                session.query(BoardRow)
+                .filter(
+                    BoardRow.board_id == resolved_board_id,
+                    BoardRow.source_note_id.is_not(None),
+                )
+                .order_by(BoardRow.sort_order, BoardRow.id)
+                .all()
+            )
+            for r in rows:
+                session.expunge(r)
+            return rows
+
     def _assert_row_in_board(self, row_id: int, board_id: int, session) -> None:
         row = session.get(BoardRow, row_id)
         if row is None or row.board_id != board_id:
@@ -253,18 +381,33 @@ class BoardService:
     # Rows
     # ------------------------------------------------------------------
 
-    def create_row(self, label: str, board_id: int | None = None) -> BoardRow:
+    def create_row(
+        self,
+        label: str,
+        board_id: int | None = None,
+        source_note_id: int | None = None,
+    ) -> BoardRow:
         label = label.strip()
         if not label:
             raise PKMError("Nhãn hàng không được để trống.")
         resolved_board_id = self._resolve_board_id(board_id)
         with get_session() as session:
+            if source_note_id is not None:
+                source_note = session.get(Note, int(source_note_id))
+                if source_note is None or source_note.is_deleted or source_note.note_type != "source_note":
+                    raise PKMError("source_note_id không hợp lệ cho board row.")
+
             max_order = (
                 session.query(BoardRow)
                 .filter(BoardRow.board_id == resolved_board_id)
                 .count()
             )
-            row = BoardRow(board_id=resolved_board_id, label=label, sort_order=max_order)
+            row = BoardRow(
+                board_id=resolved_board_id,
+                source_note_id=source_note_id,
+                label=label,
+                sort_order=max_order,
+            )
             session.add(row)
             board = session.get(Board, resolved_board_id)
             if board:
