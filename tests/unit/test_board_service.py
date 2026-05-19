@@ -129,6 +129,32 @@ class TestBoardColumns:
         assert "Link source_note" not in labels
         assert "Ghi chú mã hóa" not in labels
 
+    def test_sort_order_preserved_after_ensure_full_meta_columns(self, board_service):
+        """ensure_full_meta_columns không được ghi đè sort_order người dùng đã chỉnh."""
+        board = board_service.get_default_board()
+        cols = board_service.ensure_full_meta_columns(board_id=board.id)
+
+        # Đảo thứ tự: chuyển 2 tiêu chí đầu xuống cuối.
+        reordered = list(cols[2:]) + list(cols[:2])
+        configs = [
+            {"id": c.id, "label": c.label, "visible": True}
+            for c in reordered
+        ]
+        board_service.apply_column_configuration(board.id, configs)
+
+        expected_order = [c.label for c in reordered]
+
+        # Mô phỏng restart: ensure_full_meta_columns chạy lại.
+        board_service.ensure_full_meta_columns(board_id=board.id)
+
+        actual_order = [
+            c.label
+            for c in board_service.list_columns(board_id=board.id, visible_only=True)
+        ]
+        assert actual_order == expected_order, (
+            f"Thứ tự bị reset sau ensure.\nExpected: {expected_order}\nActual: {actual_order}"
+        )
+
     def test_hidden_meta_column_persists_after_ensure_full_meta_columns(self, board_service):
         board = board_service.get_default_board()
         cols = board_service.ensure_full_meta_columns(board_id=board.id)

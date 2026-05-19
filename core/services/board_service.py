@@ -223,9 +223,12 @@ class BoardService:
         return self.get_default_board().id
 
     def ensure_full_meta_columns(self, board_id: int | None = None) -> list[BoardColumn]:
-        """Đảm bảo board có đủ bộ cột meta-analysis 30 cột theo thứ tự chuẩn.
+        """Đảm bảo board có đủ bộ cột meta-analysis tiêu chuẩn.
 
-        Ghi chú: không xóa cột legacy để tránh mất dữ liệu cũ; UI sẽ chỉ dùng bộ 30 cột chuẩn.
+        Quy tắc quan trọng:
+        - Chỉ thêm cột còn thiếu; KHÔNG bao giờ đặt lại sort_order của cột đã tồn tại
+          để thứ tự tuỳ chỉnh của người dùng được bảo toàn sau restart.
+        - Cột tiêu chí deprecated bị xóa cứng.
         """
         resolved_board_id = self._resolve_board_id(board_id)
         with get_session() as session:
@@ -250,18 +253,21 @@ class BoardService:
             )
             by_label: dict[str, BoardColumn] = {str(col.label): col for col in existing}
 
-            for idx, label in enumerate(META_ANALYSIS_COLUMNS):
-                col = by_label.get(label)
-                if col is None:
-                    col = BoardColumn(
+            # Đặt sort_order bắt đầu từ sau giá trị lớn nhất hiện có,
+            # để cột mới thêm vào sẽ nằm sau các cột người dùng đã sắp xếp.
+            next_order = max((c.sort_order for c in existing), default=-1) + 1
+
+            for label in META_ANALYSIS_COLUMNS:
+                if by_label.get(label) is None:
+                    session.add(BoardColumn(
                         board_id=resolved_board_id,
                         label=label,
-                        sort_order=idx,
+                        sort_order=next_order,
                         is_visible=True,
-                    )
-                    session.add(col)
-                else:
-                    col.sort_order = idx
+                    ))
+                    next_order += 1
+                # Cột đã tồn tại: không chạm sort_order hay is_visible,
+                # bảo toàn thứ tự và trạng thái người dùng đã cấu hình.
 
             board = session.get(Board, resolved_board_id)
             if board:

@@ -244,8 +244,24 @@ class TestDraftWorkspaceViewSmoke:
         assert "[](URL)" in action_texts
         assert "Tùy chỉnh..." in action_texts
 
-    def test_insert_snippet_adds_template_to_editor(self, qtbot):
+    def test_insert_snippet_adds_template_to_editor(self, qtbot, monkeypatch):
+        """Snippet được chèn đúng template vào editor, bất kể catalog đã lưu trong settings."""
+        from core.services.markdown_snippet_service import MarkdownSnippet, MarkdownSnippetService
         from ui.views.draft_workspace_view import DraftWorkspaceView
+
+        _KNOWN_TEMPLATE = "$$\nBiểu thức toán test #(Eq.01)\n$$\n"
+        _test_snippet = MarkdownSnippet(
+            snippet_id="math",
+            name="$$ Math $$",
+            description="Test snippet",
+            template=_KNOWN_TEMPLATE,
+            built_in=True,
+        )
+        monkeypatch.setattr(
+            MarkdownSnippetService,
+            "get_by_id",
+            lambda self, snippet_id: _test_snippet if snippet_id == "math" else None,
+        )
 
         view = DraftWorkspaceView()
         qtbot.addWidget(view)
@@ -253,7 +269,7 @@ class TestDraftWorkspaceViewSmoke:
         view._insert_snippet("math")
 
         content = view._draft_editor.get_content()
-        assert "Biểu thức toán #(Eq.01)" in content
+        assert _KNOWN_TEMPLATE in content
 
     def test_draft_workspace_does_not_auto_create_ban_nhap_note(self, qtbot, db_session):
         from core.storage.models import Note
