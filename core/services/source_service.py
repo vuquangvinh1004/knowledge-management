@@ -87,7 +87,7 @@ class SourceService:
         year: str | None,
         fallback_filename: str,
     ) -> str:
-        """Sinh title source_note theo quy ước `source - {Tác giả} ({Năm})`.
+        """Sinh title source_note theo quy ước `{Tác giả} ({Năm})`.
 
         Nếu thiếu cả author và year, fallback về tên file (không đuôi).
         """
@@ -103,11 +103,11 @@ class SourceService:
             author_part = surnames[0]
 
         if author_part and year_part:
-            return f"source - {author_part} ({year_part})"
+            return f"{author_part} ({year_part})"
         if author_part:
-            return f"source - {author_part}"
+            return author_part
         if year_part:
-            return f"source - ({year_part})"
+            return f"({year_part})"
         return fallback_filename.strip() or "source_note"
 
     # ------------------------------------------------------------------
@@ -165,7 +165,7 @@ class SourceService:
 
     def _generate_next_source_code(self, session) -> str:
         """Sinh source_code kế tiếp chưa được dùng (AA00-ZZ99)."""
-        total = session.query(Source).count()
+        total = session.query(Source).filter(Source.source_code.is_not(None)).count()
         code = _int_to_source_code(total)
         # Đảm bảo không trùng (phòng khi có gap do xóa/rollback)
         offset = 0
@@ -173,6 +173,23 @@ class SourceService:
             offset += 1
             code = _int_to_source_code(total + offset)
         return code
+
+    def ensure_source_code(self, source_id: int) -> str:
+        """Đảm bảo source có source_code; chỉ sinh khi còn thiếu.
+
+        Trả về source_code hiện tại hoặc vừa được gán mới.
+        """
+        with get_session() as session:
+            source = session.get(Source, source_id)
+            if source is None or source.is_deleted:
+                raise SourceNotFoundError(f"Không tìm thấy source id={source_id}.")
+
+            if source.source_code:
+                return str(source.source_code)
+
+            code = self._generate_next_source_code(session)
+            source.source_code = code
+            return code
 
     # ------------------------------------------------------------------
     # Create / Import
@@ -243,7 +260,6 @@ class SourceService:
             updated_at=now,
         )
         with get_session() as session:
-            source.source_code = self._generate_next_source_code(session)
             session.add(source)
             session.flush()
             session.expunge(source)

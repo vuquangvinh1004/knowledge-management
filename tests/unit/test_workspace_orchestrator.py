@@ -127,16 +127,25 @@ class TestCreateNoteInScope:
 
 
 class TestSourceNoteResilience:
-    def test_load_source_with_note_auto_creates_when_missing(self, orchestrator, sample_pdf_path):
+    def test_load_source_with_note_raises_when_missing(self, orchestrator, sample_pdf_path):
+        from core.services.source_service import SourceService
+        from core.utils.exceptions import PKMError
+
+        src = SourceService().import_source(file_path=sample_pdf_path, title="PDF A")
+
+        with pytest.raises(PKMError, match="chưa có source_note"):
+            orchestrator.load_source_with_note(src.id)
+
+    def test_ensure_source_note_creates_when_missing(self, orchestrator, sample_pdf_path):
         from core.services.source_service import SourceService
 
         src = SourceService().import_source(file_path=sample_pdf_path, title="PDF A")
 
-        _source, note, notice = orchestrator.load_source_with_note(src.id)
+        note, notice = orchestrator.ensure_source_note(src.id)
         assert note.source_id == src.id
         assert notice is None
 
-    def test_load_source_with_note_recovers_missing_note_file(self, orchestrator, sample_pdf_path, tmp_path):
+    def test_ensure_source_note_recovers_missing_note_file(self, orchestrator, sample_pdf_path, tmp_path):
         from pathlib import Path
         from core.services.source_service import SourceService
         from core.services.note_service import NoteService
@@ -155,7 +164,7 @@ class TestSourceNoteResilience:
         assert old_path.exists()
         old_path.unlink()
 
-        _source, new_note, notice = orchestrator.load_source_with_note(src.id)
+        new_note, notice = orchestrator.ensure_source_note(src.id)
         assert new_note.id != old_note.id
         assert Path(new_note.file_path).exists()
         assert notice is not None

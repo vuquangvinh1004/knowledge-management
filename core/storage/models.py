@@ -20,6 +20,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
 
+from core.utils.public_id import generate_public_id
+
 # NOTE: Import order matters for FK resolution
 # Project must be defined before Note because Note references projects.id
 
@@ -42,9 +44,11 @@ class Project(Base):
     __tablename__ = "projects"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    public_id = Column(String(36), unique=True, nullable=False, default=generate_public_id)
     name = Column(Text, nullable=False)
     description = Column(Text)
     status = Column(String(16), nullable=False, default="active")  # active | closed | archived
+    # 0=đang sử dụng, 1=xóa tạm (soft-delete), 2=đã xóa (hard-marked, chờ purge)
     is_deleted = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, nullable=False, default=_utcnow)
     updated_at = Column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
@@ -68,6 +72,7 @@ class Source(Base):
     __tablename__ = "sources"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    public_id = Column(String(36), unique=True, nullable=False, default=generate_public_id)
     source_code = Column(String(4), unique=True, nullable=True)  # AA00-ZZ99
     file_path = Column(Text, nullable=False, unique=True)
     file_hash = Column(String(64), nullable=False)
@@ -99,6 +104,7 @@ class Note(Base):
     __tablename__ = "notes"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    public_id = Column(String(36), unique=True, nullable=False, default=generate_public_id)
     source_id = Column(Integer, ForeignKey("sources.id", ondelete="SET NULL"), nullable=True)
     title = Column(Text, nullable=False)
     slug = Column(Text, nullable=False, unique=True)
@@ -141,6 +147,7 @@ class Extract(Base):
     __tablename__ = "extracts"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    public_id = Column(String(36), unique=True, nullable=False, default=generate_public_id)
     source_id = Column(Integer, ForeignKey("sources.id", ondelete="RESTRICT"), nullable=False)
     note_id = Column(Integer, ForeignKey("notes.id", ondelete="SET NULL"), nullable=True)
     page_no = Column(Integer, nullable=False)
@@ -168,6 +175,7 @@ class Asset(Base):
     __tablename__ = "assets"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    public_id = Column(String(36), unique=True, nullable=False, default=generate_public_id)
     source_id = Column(Integer, ForeignKey("sources.id", ondelete="SET NULL"), nullable=True)
     note_id = Column(Integer, ForeignKey("notes.id", ondelete="SET NULL"), nullable=True)
     asset_type = Column(String(16), nullable=False)  # image | snapshot
@@ -192,6 +200,7 @@ class Tag(Base):
     __tablename__ = "tags"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    public_id = Column(String(36), unique=True, nullable=False, default=generate_public_id)
     name = Column(Text, nullable=False, unique=True)
     color = Column(String(7))  # hex color e.g. #FF5733
     created_at = Column(DateTime, nullable=False, default=_utcnow)
@@ -225,6 +234,7 @@ class Link(Base):
     __tablename__ = "links"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    public_id = Column(String(36), unique=True, nullable=False, default=generate_public_id)
     from_note_id = Column(Integer, ForeignKey("notes.id", ondelete="CASCADE"), nullable=False)
     to_note_id = Column(Integer, ForeignKey("notes.id", ondelete="CASCADE"), nullable=False)
     link_type = Column(String(16), nullable=False)  # wikilink | manual | inferred
@@ -248,6 +258,7 @@ class Board(Base):
     __tablename__ = "boards"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    public_id = Column(String(36), unique=True, nullable=False, default=generate_public_id)
     title = Column(Text, nullable=False)
     board_type = Column(String(32), nullable=False, default="general")
     linked_note_id = Column(Integer, ForeignKey("notes.id", ondelete="SET NULL"), nullable=True)
@@ -269,6 +280,7 @@ class BoardRow(Base):
     __table_args__ = (UniqueConstraint("board_id", "source_note_id", name="uq_board_rows_board_source_note"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    public_id = Column(String(36), unique=True, nullable=False, default=generate_public_id)
     board_id = Column(Integer, ForeignKey("boards.id", ondelete="CASCADE"), nullable=False)
     source_note_id = Column(Integer, ForeignKey("notes.id", ondelete="SET NULL"), nullable=True)
     label = Column(Text, nullable=False)
@@ -285,6 +297,7 @@ class BoardColumn(Base):
     __tablename__ = "board_columns"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    public_id = Column(String(36), unique=True, nullable=False, default=generate_public_id)
     board_id = Column(Integer, ForeignKey("boards.id", ondelete="CASCADE"), nullable=False)
     label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
@@ -300,6 +313,7 @@ class BoardCell(Base):
     __tablename__ = "board_cells"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    public_id = Column(String(36), unique=True, nullable=False, default=generate_public_id)
     row_id = Column(Integer, ForeignKey("board_rows.id", ondelete="CASCADE"), nullable=False)
     col_id = Column(Integer, ForeignKey("board_columns.id", ondelete="CASCADE"), nullable=False)
     linked_note_id = Column(Integer, ForeignKey("notes.id", ondelete="SET NULL"), nullable=True)

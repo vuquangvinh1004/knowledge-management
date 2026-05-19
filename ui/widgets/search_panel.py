@@ -36,18 +36,31 @@ class SearchResultItem(QListWidgetItem):
         title: str,
         snippet: str,
         source_id: int | None = None,
+        entity_public_id: str | None = None,
+        source_public_id: str | None = None,
     ) -> None:
         super().__init__()
         self.entity_type = entity_type
         self.entity_id = entity_id
         self.source_id = source_id
+        self.entity_public_id = entity_public_id
+        self.source_public_id = source_public_id
 
         type_label = "Ghi chú" if entity_type == "note" else "Trích xuất"
         display = f"[{type_label}] {title}"
         if snippet:
             display += f"\n  {snippet[:100]}"
         self.setText(display)
-        self.setToolTip(f"{type_label} #{entity_id}\n{snippet}")
+        tooltip_lines = [f"{type_label} #{entity_id}"]
+        if self.entity_public_id:
+            tooltip_lines.append(f"Public ID: {self.entity_public_id}")
+        if self.source_id is not None:
+            tooltip_lines.append(f"Source ID: {self.source_id}")
+        if self.source_public_id:
+            tooltip_lines.append(f"Source Public ID: {self.source_public_id}")
+        if snippet:
+            tooltip_lines.append(snippet)
+        self.setToolTip("\n".join(tooltip_lines))
 
 
 class SearchPanelDialog(QDialog):
@@ -180,6 +193,8 @@ class SearchPanelDialog(QDialog):
                 title=r.title,
                 snippet=r.snippet,
                 source_id=r.source_id,
+                entity_public_id=r.entity_public_id,
+                source_public_id=r.source_public_id,
             )
             self._result_list.addItem(item)
 

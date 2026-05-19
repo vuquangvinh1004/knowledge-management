@@ -64,10 +64,15 @@ class TestMigrationService:
             row_cols = {c["name"] for c in inspector.get_columns("board_rows")}
             col_cols = {c["name"] for c in inspector.get_columns("board_columns")}
             note_cols = {c["name"] for c in inspector.get_columns("notes")}
+            source_cols = {c["name"] for c in inspector.get_columns("sources")}
+            project_cols = {c["name"] for c in inspector.get_columns("projects")}
             assert "board_id" in row_cols
             assert "board_id" in col_cols
             assert "is_visible" in col_cols
             assert "meta_json" in note_cols
+            assert "public_id" in note_cols
+            assert "public_id" in source_cols
+            assert "public_id" in project_cols
         finally:
             _cleanup(engine)
 

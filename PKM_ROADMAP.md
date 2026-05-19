@@ -1,6 +1,6 @@
 # RESEARCH-FOCUSED PKM ROADMAP
 
-> Cập nhật: 2026-05-12 (Public-readiness cleanup + logging hardening)
+> Cập nhật: 2026-05-19 (Dual-ID public_id UUIDv7 rollout)
 > Phiên bản mục tiêu: v1.0.0-alpha
 > Mục tiêu: desktop app ổn định, local-first, source-grounded, đủ mạnh cho đọc PDF, trích xuất, ghi chú và tổng hợp nghiên cứu
 > Cập nhật UI shell gần nhất: 2026-05-18 (tối giản GC Nguồn, chuyển GC Khái niệm/GC Tổng hợp sang single-editor + document tabs)
@@ -370,10 +370,43 @@ Deliverable: cải thiện tính ổn định thao tác xóa cứng và trải n
 | Bảo toàn dữ liệu tiêu chí hệ thống khi "xóa" | Done | Cao | Tiêu chí hệ thống không xóa cứng; được chuyển sang hidden để tránh mất dữ liệu |
 | Loại bỏ triệt để tiêu chí không bắt buộc | Done | Cao | Xóa khỏi bộ tiêu chí hệ thống: `ID`, `Mã nghiên cứu`, `Hướng tác động`, `Effect size`, `Loại effect size`, `SE/SD`, `CI thấp`, `CI cao`, `p-value`, `Chất lượng nghiên cứu`, `Ghi chú mã hóa`, và 3 link-note |
 | Fix persist thứ tự tiêu chí sau restart | Done | Cao | Sửa `ensure_full_meta_columns()` để không ghi đè `sort_order` cột đã tồn tại; bảo toàn thứ tự người dùng đã lưu |
+| Trang chính: thêm bảng Danh sách ghi chú | Done | Cao | Hiển thị STT, tên, loại, chế độ (Global/Project), trạng thái note theo màu |
+| Sort và filter theo header cho bảng ghi chú | Done | Cao | Click header để sort; chuột phải header để lọc theo cột và xóa bộ lọc |
+| Đổi tên note bằng chuột phải trên tab ghi chú | Done | Cao | Menu `Sửa tên` trên tab note (tương tự worksheet); cập nhật title và đồng bộ toàn app ngay |
+| Bảng ghi chú: thay ID bằng STT | Done | Cao | Cột đầu là STT (thứ tự hiển thị), khóa sort/filter cho STT; các cột còn lại vẫn sort/filter |
+| Source note: bỏ tiền tố `source -` khi sinh title mới | Done | Cao | Cập nhật `build_source_note_title()` để trả về `{Tác giả} ({Năm})`; dashboard tự bỏ prefix legacy khi hiển thị |
+| Trạng thái note 3 mức trên dashboard | Done | Cao | Đang sử dụng (xanh), Xóa tạm (xám), Đã xóa (đỏ) dựa trên `notes.is_deleted` = 0/1/2 |
+| Context menu theo trạng thái note trên dashboard | Done | Cao | Xóa tạm: `Khôi phục`/`Xóa cứng`; Đã xóa: `Xóa hoàn toàn` (có cảnh báo) |
 | Đồng bộ quotes Metadata trong source_note template | Done | Cao | Template `## Metadata` chỉ còn quotes của tiêu chí hệ thống bắt buộc |
-| Test hồi quy UI + unit | Done | Cao | 423 tests pass; thêm test unit giữ reorder sau `ensure_full_meta_columns()` và 2 UI smoke tests cho khóa/xóa tiêu chí trong dialog |
+| Test hồi quy UI + unit | Done | Cao | 428 tests pass; thêm unit tests cho restore/hard-mark delete và smoke tests cho dashboard actions |
 
 Deliverable: bảng tổng hợp hiển thị đầy đủ nội dung, quote blocks có background nhất quán khi tràn dòng, người dùng quản lý tiêu chí linh hoạt hơn.
+
+#### 2026-05-19 — Dual-ID rollout (public_id UUIDv7)
+
+| Hạng mục | Trạng thái | Ưu tiên | Ghi chú |
+| --- | --- | --- | --- |
+| Reset sạch dữ liệu runtime cho sandbox | Done | Cao | Xóa toàn bộ `data/*` runtime (giữ `.gitkeep`) để chuẩn bị thay đổi cơ chế ID |
+| Thêm utility sinh `public_id` | Done | Cao | `core/utils/public_id.py` dùng UUIDv7 (fallback UUID4) |
+| ORM bổ sung cột `public_id` | Done | Cao | Áp dụng cho `projects`, `sources`, `notes`, `extracts`, `assets`, `tags`, `links`, `boards`, `board_rows`, `board_columns`, `board_cells` |
+| Migration 0011 thêm + backfill + unique | Done | Cao | Revision `0011_add_public_id_uuidv7` thêm `public_id`, backfill toàn bộ record hiện có, khóa `NOT NULL` + `UNIQUE` |
+| Regression tests cho schema/runtime | Done | Cao | Cập nhật `test_migration.py`, `test_note_service.py`, `test_source_service.py` xác nhận `public_id` hoạt động |
+
+Deliverable: hệ thống dùng mô hình Dual-ID ổn định: ID số nguyên giữ cho FK nội bộ, `public_id` UUIDv7 dùng cho định danh công khai/mở rộng liên thông.
+
+#### 2026-05-19 — Source-note creation workflow hardening
+
+| Hạng mục | Trạng thái | Ưu tiên | Ghi chú |
+| --- | --- | --- | --- |
+| Import thư viện chỉ lưu source thô | Done | Cao | `ImportSourceDialog` bỏ hoàn toàn trường/logic tạo `source_note` khi import |
+| Source code chỉ sinh khi tạo source_note | Done | Cao | `SourceService.import_source()` không gán `source_code`; `NoteService.create_note(source_note)` gọi `ensure_source_code()` |
+| GC Nguồn: CTA đổi thành `Tạo note mới` | Done | Cao | Empty state của `WorkspaceView` chuyển từ `Vào Thư viện` sang luồng tạo source_note có chủ đích |
+| Tạo source_note qua Library có confirm | Done | Cao | Chế độ chọn tài liệu trong `LibraryView` + xác nhận Có/Không trước khi tạo |
+| Chặn tạo trùng source_note | Done | Cao | Nếu source đã có source_note thì báo và không cho tạo mới |
+| Library detail panel tối giản action | Done | Trung bình | Chỉ giữ `Mở tài liệu` + `Chỉnh sửa thông tin`, bỏ nút `Ghi chú nguồn` |
+| Dashboard header filter badge | Done | Trung bình | Cột đang lọc hiển thị badge `[F]` ngay trên header |
+
+Deliverable: tách rõ workflow `import source` và `create source_note`, giảm tạo dữ liệu ngoài ý muốn và tăng khả năng nhận diện trạng thái lọc ở Trang chính.
 
 ---
 

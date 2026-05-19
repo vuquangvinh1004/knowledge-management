@@ -33,13 +33,13 @@ class LibraryView(QWidget):
     - Context menu: mở, chỉnh sửa, xóa mềm
 
     Signals:
-        open_source_requested(int): Khi người dùng muốn mở source.
         open_reference_requested(int): Khi người dùng muốn mở PDF tham khảo trong Workspace.
+        create_source_note_requested(int): Khi người dùng xác nhận tạo source_note từ source đã chọn.
         import_requested: Khi nhấn nút Nhập nguồn.
     """
 
-    open_source_requested = Signal(int)
     open_reference_requested = Signal(int)
+    create_source_note_requested = Signal(int)
     import_requested = Signal()
 
     def __init__(self, parent=None) -> None:
@@ -47,6 +47,7 @@ class LibraryView(QWidget):
         self._sources: list = []
         self._project_id: int | None = None
         self._project_source_ids: set[int] | None = None
+        self._source_note_creation_mode = False
         self._build_ui()
 
     # ------------------------------------------------------------------
@@ -110,7 +111,6 @@ class LibraryView(QWidget):
 
         # --- Phải: source detail panel ---
         self._detail_panel = SourceDetailPanel()
-        self._detail_panel.open_requested.connect(self.open_source_requested)
         self._detail_panel.open_reference_requested.connect(self.open_reference_requested)
         self._detail_panel.refresh_requested.connect(self._on_detail_refresh)
         splitter.addWidget(self._detail_panel)
@@ -140,6 +140,14 @@ class LibraryView(QWidget):
             self._sources = []
         self._populate_list(self._sources)
 
+    def start_source_note_creation_mode(self) -> None:
+        """Bật chế độ chọn tài liệu để tạo source_note từ GC Nguồn."""
+        self._source_note_creation_mode = True
+
+    def end_source_note_creation_mode(self) -> None:
+        """Tắt chế độ tạo source_note theo lựa chọn tài liệu."""
+        self._source_note_creation_mode = False
+
     def set_project_context(self, project_id: int | None) -> None:
         """Bật/tắt Project mode cho Library view.
 
@@ -165,11 +173,13 @@ class LibraryView(QWidget):
             if src.year:
                 parts.append(src.year)
             suffix = " — " + ", ".join(parts) if parts else ""
-            item = QListWidgetItem(
-                f"[{src.source_code or src.id}] {src.title or '(Không có tiêu đề)'}{suffix}"
-            )
+            code_prefix = f"[{src.source_code}] " if src.source_code else ""
+            item = QListWidgetItem(f"{code_prefix}{src.title or '(Không có tiêu đề)'}{suffix}")
             item.setData(Qt.ItemDataRole.UserRole, src.id)
-            item.setToolTip(f"Source: {src.source_code or src.id}\n{src.file_path}")
+            tooltip_lines = [f"Nguồn: {src.file_path}"]
+            if src.source_code:
+                tooltip_lines.insert(0, f"Source code: {src.source_code}")
+            item.setToolTip("\n".join(tooltip_lines))
             self._list_widget.addItem(item)
 
     def _filter_list(self, query: str) -> None:
@@ -218,7 +228,10 @@ class LibraryView(QWidget):
     def _on_item_double_clicked(self, item: QListWidgetItem) -> None:
         source_id = item.data(Qt.ItemDataRole.UserRole)
         if source_id is not None:
-            self.open_source_requested.emit(source_id)
+            if self._source_note_creation_mode:
+                self._request_create_source_note(int(source_id), item.text())
+            else:
+                self.open_reference_requested.emit(int(source_id))
 
     def _on_detail_refresh(self) -> None:
         """Reload list sau khi metadata được cập nhật."""
@@ -230,7 +243,9 @@ class LibraryView(QWidget):
             return
         source_id = item.data(Qt.ItemDataRole.UserRole)
         menu = QMenu(self)
-        act_open = menu.addAction("📖  Ghi chú nguồn")
+        act_create_source_note = None
+        if self._source_note_creation_mode:
+            act_create_source_note = menu.addAction("📝  Tạo source_note")
         act_open_reference = menu.addAction("📄  Mở tài liệu")
         act_edit = menu.addAction("✏  Chỉnh sửa thông tin")
         act_delete = menu.addAction("❌  Xóa khỏi thư viện")
@@ -238,8 +253,8 @@ class LibraryView(QWidget):
         
 
         chosen = menu.exec(self._list_widget.mapToGlobal(pos))
-        if chosen == act_open:
-            self.open_source_requested.emit(source_id)
+        if chosen == act_create_source_note:
+            self._request_create_source_note(int(source_id), item.text())
         elif chosen == act_open_reference:
             self.open_reference_requested.emit(source_id)
         elif chosen == act_edit:
@@ -263,6 +278,16 @@ class LibraryView(QWidget):
                 self.refresh()
             except Exception as exc:  # noqa: BLE001
                 QMessageBox.critical(self, "Lỗi", str(exc))
+
+    def _request_create_source_note(self, source_id: int, label: str) -> None:
+        reply = QMessageBox.question(
+            self,
+            "Xác nhận tạo note",
+            f"Bạn có chắc chắn tạo note với tài liệu này không?\n\n{label}",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self.create_source_note_requested.emit(source_id)
 
     def showEvent(self, event) -> None:  # noqa: N802
         super().showEvent(event)

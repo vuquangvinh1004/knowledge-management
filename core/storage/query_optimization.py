@@ -272,6 +272,7 @@ def list_orphan_note_ids_efficient(session: Session) -> list[int]:
 class NoteManagementItem:
     """DTO cho note management list display."""
     note_id: int
+    note_public_id: str
     title: str
     note_type: str
     source_id: int | None
@@ -310,6 +311,7 @@ def list_notes_for_management_efficient(session: Session, include_deleted: bool 
     
     query = session.query(
         Note.id,
+        Note.public_id,
         Note.title,
         Note.note_type,
         Note.source_id,
@@ -327,7 +329,7 @@ def list_notes_for_management_efficient(session: Session, include_deleted: bool 
     
     items: list[NoteManagementItem] = []
     for row in rows:
-        note_id, title, note_type, source_id, project_id, project_name, file_path, is_deleted, updated_at = row
+        note_id, note_public_id, title, note_type, source_id, project_id, project_name, file_path, is_deleted, updated_at = row
         
         scope_label = "Global"
         if project_id is not None:
@@ -336,6 +338,7 @@ def list_notes_for_management_efficient(session: Session, include_deleted: bool 
         items.append(
             NoteManagementItem(
                 note_id=int(note_id),
+                note_public_id=str(note_public_id or ""),
                 title=str(title or ""),
                 note_type=str(note_type),
                 source_id=int(source_id) if source_id is not None else None,

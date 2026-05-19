@@ -146,7 +146,10 @@ class TestSearchService:
         svc.index_note_by_id(note.id)
 
         results = svc.search("machine")
-        assert any(r.entity_id == note.id for r in results)
+        matched = next((r for r in results if r.entity_id == note.id), None)
+        assert matched is not None
+        assert matched.entity_public_id == note.public_id
+        assert matched.source_public_id == src.public_id
 
     def test_search_empty_query_returns_empty(self, db_session, notes_dir):
         from core.services.search_service import SearchService

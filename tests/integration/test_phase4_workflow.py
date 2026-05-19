@@ -125,6 +125,8 @@ class TestExportWorkflow:
         text = output.read_text(encoding="utf-8")
         assert "Export Test PDF" in text
         assert "Nội dung nghiên cứu" in text
+        assert "**Public ID:**" in text
+        assert src.public_id in text
 
     def test_export_source_bundle_not_found_raises(self, export_service, notes_dir):
         from core.utils.exceptions import PKMError

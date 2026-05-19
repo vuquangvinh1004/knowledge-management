@@ -124,12 +124,13 @@ class MainWindow(QMainWindow):
         self._sidebar.project_manager_requested.connect(self._open_project_manager_dialog)
 
         # Dashboard
-        self._dashboard_view.open_source_requested.connect(self._open_source_in_workspace)
+        self._dashboard_view.open_source_requested.connect(self._open_reference_in_workspace)
         self._dashboard_view.import_requested.connect(self._open_import_dialog)
+        self._dashboard_view.note_catalog_changed.connect(self._on_note_catalog_changed)
 
         # Library
-        self._library_view.open_source_requested.connect(self._open_source_in_workspace)
         self._library_view.open_reference_requested.connect(self._open_reference_in_workspace)
+        self._library_view.create_source_note_requested.connect(self._create_source_note_from_library)
         self._library_view.import_requested.connect(self._open_import_dialog)
 
         # Board / Graph view relay
@@ -140,7 +141,9 @@ class MainWindow(QMainWindow):
         self._note_management_view.note_open_requested.connect(self._open_note_in_workspace)
         self._note_management_view.note_deleted.connect(self._on_note_catalog_changed)
         self._note_management_view.note_created.connect(self._open_note_in_workspace)
+        self._note_management_view.note_renamed.connect(self._on_note_catalog_changed)
         self._note_management_view.library_requested.connect(lambda: self._navigate_to(NAV_LIBRARY))
+        self._note_management_view.create_note_requested.connect(self._start_create_source_note_flow)
 
         # Workspace empty state action
         if hasattr(self._workspace_view, "_empty_state"):
@@ -181,6 +184,14 @@ class MainWindow(QMainWindow):
     def _open_import_dialog(self) -> None:
         """Mở dialog nhập PDF mới."""
         mwh.open_import_dialog(self)
+
+    def _start_create_source_note_flow(self) -> None:
+        """Bắt đầu workflow tạo source_note từ GC Nguồn."""
+        mwh.start_create_source_note_flow(self, NAV_LIBRARY)
+
+    def _create_source_note_from_library(self, source_id: int) -> None:
+        """Tạo source_note tường minh cho source được chọn trong Library."""
+        mwh.create_source_note_from_library(self, source_id)
 
     def _open_source_in_workspace(self, source_id: int) -> None:
         """Mở source trong tab GC Nguồn và chuyển sang tab Quản lý ghi chú."""

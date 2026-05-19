@@ -70,6 +70,8 @@ class ExportService:
             src_title = source.title or f"Source {source_id}"
             src_authors = source.authors or ""
             src_year = source.year or ""
+            src_public_id = str(source.public_id or "")
+            src_code = str(source.source_code or "")
 
             note_content = ""
             if source_note:
@@ -80,6 +82,8 @@ class ExportService:
             lines: list[str] = [
                 f"# {src_title}",
                 "",
+                f"**Public ID:** {src_public_id}" if src_public_id else "",
+                f"**Mã nguồn:** {src_code}" if src_code else "",
                 f"**Tác giả:** {src_authors}" if src_authors else "",
                 f"**Năm:** {src_year}" if src_year else "",
                 "",
@@ -143,6 +147,7 @@ class ExportService:
             project_name = str(project.name or f"Project {project_id}")
             project_desc = str(project.description or "")
             project_status = str(project.status or "active")
+            project_public_id = str(project.public_id or "")
             created_at = project.created_at
 
         safe_name = "".join(c if c.isalnum() or c in " _-" else "_" for c in project_name).strip()
@@ -160,6 +165,8 @@ class ExportService:
         lines: list[str] = [
             f"# {project_name}",
             "",
+            f"**Project Public ID:** {project_public_id}" if project_public_id else "",
+            "",
             f"**Mô tả:** {project_desc}",
             "",
             f"**Trạng thái:** {project_status}",
@@ -174,11 +181,19 @@ class ExportService:
             "",
         ]
         for note in own_notes:
-            lines.append(f"- [{note.title}](own/{Path(note.file_path).name})")
+            note_public_id = str(getattr(note, "public_id", "") or "")
+            if note_public_id:
+                lines.append(f"- [{note.title}](own/{Path(note.file_path).name}) — `{note_public_id}`")
+            else:
+                lines.append(f"- [{note.title}](own/{Path(note.file_path).name})")
 
         lines += ["", f"## Notes tham khảo từ Global ({len(ref_notes)} notes)", ""]
         for note in ref_notes:
-            lines.append(f"- [{note.title}](refs/{Path(note.file_path).name})")
+            note_public_id = str(getattr(note, "public_id", "") or "")
+            if note_public_id:
+                lines.append(f"- [{note.title}](refs/{Path(note.file_path).name}) — `{note_public_id}`")
+            else:
+                lines.append(f"- [{note.title}](refs/{Path(note.file_path).name})")
 
         readme_path.write_text("\n".join(lines), encoding="utf-8")
 

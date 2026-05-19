@@ -481,6 +481,7 @@ Phiên bản v1.0 sử dụng các bảng chính sau:
 
 ### 7.2. Trường bắt buộc cần chú ý
 
+- `*.public_id` (UUIDv7) cho các thực thể chính: projects, sources, notes, extracts, assets, tags, links, boards, board_rows, board_columns, board_cells
 - `sources.file_path`
 - `sources.file_hash`
 - `notes.note_type`
@@ -1237,6 +1238,12 @@ ADDED | GitHub Copilot (GPT-5.3-Codex) | TESTS_UI | Thêm smoke tests xác nhậ
 
 ### 2026-05-19
 
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | ID_STRATEGY | Áp dụng mô hình Dual-ID cho các thực thể chính: giữ `id` INTEGER cho FK nội bộ, bổ sung `public_id` (UUIDv7) để dùng làm định danh public/stable cho luồng hiển thị và mở rộng liên thông.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | SCHEMA | `projects`, `sources`, `notes`, `extracts`, `assets`, `tags`, `links`, `boards`, `board_rows`, `board_columns`, `board_cells` bổ sung cột `public_id` (TEXT 36), unique, not null.
+
+Migration Notes | Revision `20260519_0011_add_public_id_uuidv7.py`: thêm `public_id` nullable trước, backfill UUIDv7 cho bản ghi hiện có, sau đó khóa `NOT NULL` + `UNIQUE` theo từng bảng bằng batch alter tương thích SQLite.
+
 CHANGED | GitHub Copilot (GPT-5.3-Codex) | BOARD_SCHEMA | `board_rows` bổ sung `source_note_id` (FK notes) + unique theo (`board_id`, `source_note_id`) để hỗ trợ quy tắc 1 hàng = 1 source_note trong tab Bảng nghiên cứu.
 
 Migration Notes | Revision `20260519_0009_add_board_row_source_note_link.py`: thêm cột `board_rows.source_note_id`, index `ix_board_rows_source_note_id`, unique constraint `uq_board_rows_board_source_note`; dữ liệu legacy được giữ nguyên.
@@ -1572,3 +1579,23 @@ CHANGED | GitHub Copilot (GPT-5.3-Codex) | UI_SHELL | Gỡ hoàn toàn nút `Pro
 CHANGED | GitHub Copilot (GPT-5.3-Codex) | UI_SETTINGS | Mode indicator trong `SettingsView` được nâng cấp thành badge màu: Global (xanh lá) và Project (xanh dương) để tăng tốc độ nhận diện trạng thái làm việc.
 
 ADDED | GitHub Copilot (GPT-5.3-Codex) | TESTING | Bổ sung smoke tests xác nhận highlight cho inline math và display math block; nhóm `TestMarkdownEditorSmoke` đạt 12/12 pass.
+
+### 2026-05-19 — Source-note explicit creation workflow + Header filter badge
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | IMPORT_WORKFLOW | `ImportSourceDialog` chuyển sang import thuần `Source`: bỏ trường `Tiêu đề source_note` và bỏ luồng tạo `source_note` tự động khi nhập tài liệu.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | SERVICES | `SourceService.import_source()` không còn gán `source_code` lúc import; bổ sung/preserve API `ensure_source_code(source_id)` để cấp mã tài liệu theo nhu cầu nghiệp vụ.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | SERVICES | `NoteService.create_note()` khi tạo `source_note` sẽ gọi `ensure_source_code()` để đảm bảo mã tài liệu chỉ được sinh tại thời điểm người dùng thật sự khởi tạo note nguồn.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | SERVICES | `WorkspaceOrchestrator.load_source_with_note()` không tự tạo note nguồn nữa; nếu thiếu `source_note` sẽ trả lỗi nghiệp vụ để UI điều hướng sang luồng tạo chủ động.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | UI_WORKFLOW | Empty-state tab `GC Nguồn` đổi CTA sang `Tạo note mới`; thao tác này đưa người dùng sang `Thư viện nguồn` trong chế độ chọn tài liệu để tạo `source_note`.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | UI_LIBRARY_WORKFLOW | `LibraryView` thêm creation mode cho `source_note` với xác nhận Có/Không trước khi tạo; chặn tạo trùng nếu source đã có `source_note` và mở note hiện hữu thay vì tạo mới.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | UI_LIBRARY_WORKFLOW | `SourceDetailPanel` rút còn 2 thao tác: `Mở tài liệu` và `Chỉnh sửa thông tin`; bỏ action `Ghi chú nguồn` để tránh nhầm với luồng tạo note có chủ đích.
+
+CHANGED | GitHub Copilot (GPT-5.3-Codex) | UI_DASHBOARD | Header bảng quản lý note hiển thị badge `[F]` trên cột đang có filter active để tăng khả năng nhận diện trạng thái lọc.
+
+ADDED | GitHub Copilot (GPT-5.3-Codex) | TESTING | Regression tests cập nhật theo contract mới cho orchestrator/workflow và UI badge filter. Validation: full suite `429/429` pass.

@@ -81,6 +81,7 @@ class WorkspaceOrchestrator:
             year=source.year,
             fallback_filename=Path(source.file_path).stem,
         )
+
         note = note_svc.create_note(
             title=auto_title,
             note_type="source_note",
@@ -102,15 +103,26 @@ class WorkspaceOrchestrator:
         return note, notice
 
     def load_source_with_note(self, source_id: int):
-        """Lấy source và source_note, tự phục hồi nếu file note bị mất.
+        """Lấy source và source_note đã tồn tại.
 
         Returns:
             tuple(source, note, notice)
-            - notice: thông báo phục hồi cho UI (nếu có)
+            - notice: luôn None ở luồng read-only này.
         """
         source = SourceService().get_by_id(source_id)
-        note, notice = self.ensure_source_note(source_id)
-        return source, note, notice
+        note = NoteService(self._notes_dir).get_source_note(source_id)
+        if note is None:
+            raise PKMError(
+                "Tài liệu này chưa có source_note. Vào thẻ GC Nguồn và bấm 'Tạo note mới' để khởi tạo."
+            )
+
+        note_path = Path(str(note.file_path or ""))
+        if not note.file_path or not note_path.exists():
+            raise PKMError(
+                "source_note hiện tại bị thiếu file. Hãy tạo lại source_note từ GC Nguồn."
+            )
+
+        return source, note, None
 
     def update_last_opened_page(self, source_id: int, page_no: int) -> None:
         """Lưu trang hiện tại của source, có log ngữ cảnh nếu lỗi."""

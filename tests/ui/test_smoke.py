@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QInputDialog, QWidget
 
 
 # ---------------------------------------------------------------------------
@@ -162,6 +162,129 @@ class TestDashboardViewSmoke:
         view = DashboardView()
         qtbot.addWidget(view)
         view.refresh()  # không có data → empty state
+
+    def test_dashboard_note_table_supports_sort_and_header_filter(self, qtbot, monkeypatch):
+        from core.services.note_service import NoteService
+        from ui.views.dashboard_view import DashboardView
+
+        rows = [
+            {
+                "note_id": 1,
+                "title": "Alpha",
+                "note_type": "concept_note",
+                "scope_label": "Global",
+                "is_deleted": 0,
+            },
+            {
+                "note_id": 2,
+                "title": "Beta",
+                "note_type": "synthesis_note",
+                "scope_label": "Project: A",
+                "is_deleted": 1,
+            },
+        ]
+
+        monkeypatch.setattr(DashboardView, "_load_stats", lambda self: None)
+        monkeypatch.setattr(DashboardView, "_load_recent", lambda self: None)
+        monkeypatch.setattr(
+            NoteService,
+            "list_notes_for_management",
+            lambda self, include_deleted=False: list(rows),
+        )
+
+        view = DashboardView()
+        qtbot.addWidget(view)
+        view.refresh()
+
+        assert view._notes_table.rowCount() == 2
+        assert not view._notes_table.isSortingEnabled()
+
+        # Cột STT bị khóa, click sort không làm đổi thứ tự.
+        first_before = view._notes_table.item(0, 1).text()
+        view._on_notes_header_clicked(0)
+        first_after = view._notes_table.item(0, 1).text()
+        assert first_before == first_after
+
+        # Cột Tên ghi chú vẫn sort được.
+        view._on_notes_header_clicked(1)
+        assert view._notes_table.item(0, 1).text() == "Beta"
+
+        assert view._notes_table.item(0, 4).text() == "● Xóa tạm"
+
+        view._active_note_filters = {1: {"Alpha"}}
+        view._apply_note_filters()
+        view._refresh_note_header_filter_badges()
+        assert not view._notes_table.isRowHidden(1)
+        assert view._notes_table.isRowHidden(0)
+        assert "[F]" in view._notes_table.horizontalHeaderItem(1).text()
+
+    def test_dashboard_can_restore_soft_deleted_note(self, qtbot, monkeypatch):
+        from core.services.note_service import NoteService
+        from ui.views.dashboard_view import DashboardView
+
+        called = {"restore": 0}
+
+        monkeypatch.setattr(
+            NoteService,
+            "restore",
+            lambda self, note_id: called.__setitem__("restore", called["restore"] + 1),
+        )
+        monkeypatch.setattr(DashboardView, "refresh", lambda self: None)
+
+        view = DashboardView()
+        qtbot.addWidget(view)
+
+        with qtbot.waitSignal(view.note_catalog_changed, timeout=1000):
+            view._restore_note(7)
+
+        assert called["restore"] == 1
+
+    def test_dashboard_can_mark_hard_delete_and_purge(self, qtbot, monkeypatch):
+        from PySide6.QtWidgets import QMessageBox
+
+        from core.services.note_service import NoteService
+        from ui.views.dashboard_view import DashboardView
+
+        called = {"mark": 0, "purge": 0}
+
+        monkeypatch.setattr(
+            NoteService,
+            "get_note_delete_impact",
+            lambda self, note_id: {
+                "title": "Note X",
+                "incoming_links": 0,
+                "outgoing_links": 0,
+                "extract_refs": 0,
+                "asset_refs": 0,
+            },
+        )
+        monkeypatch.setattr(
+            NoteService,
+            "mark_hard_deleted",
+            lambda self, note_id, delete_file=True: called.__setitem__("mark", called["mark"] + 1),
+        )
+        monkeypatch.setattr(
+            NoteService,
+            "hard_delete",
+            lambda self, note_id, delete_file=True: called.__setitem__("purge", called["purge"] + 1),
+        )
+        monkeypatch.setattr(
+            QMessageBox,
+            "warning",
+            lambda *args, **kwargs: QMessageBox.StandardButton.Yes,
+        )
+        monkeypatch.setattr(DashboardView, "refresh", lambda self: None)
+
+        view = DashboardView()
+        qtbot.addWidget(view)
+
+        with qtbot.waitSignal(view.note_catalog_changed, timeout=1000):
+            view._mark_note_hard_deleted(11)
+        with qtbot.waitSignal(view.note_catalog_changed, timeout=1000):
+            view._purge_note(11)
+
+        assert called["mark"] == 1
+        assert called["purge"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -438,6 +561,53 @@ class TestDraftWorkspaceViewSmoke:
         assert view._pdf_viewers[0]._nav_bar.isVisible()
         view._toggle_read_focus_mode()
         assert not view._pdf_viewers[0]._nav_bar.isVisible()
+
+
+class TestNoteListEditorTabSmoke:
+    def test_rename_note_from_tab_updates_title_and_emits_signal(self, qtbot, monkeypatch):
+        from types import SimpleNamespace
+
+        from core.services.note_service import NoteService
+        from ui.widgets.markdown_editor import MarkdownEditorWidget
+        from ui.widgets.note_list_editor_tab import NoteListEditorTab
+
+        notes = [
+            SimpleNamespace(id=101, title="Concept A", project_id=None, is_deleted=0),
+        ]
+
+        def _list_all(self, note_type=None, include_deleted=False):
+            return list(notes)
+
+        def _update_title(self, note_id, new_title):
+            for n in notes:
+                if int(n.id) == int(note_id):
+                    n.title = new_title
+                    return n
+            raise AssertionError("note_id không tồn tại trong test data")
+
+        monkeypatch.setattr(NoteService, "list_all", _list_all)
+        monkeypatch.setattr(NoteService, "update_title", _update_title)
+        monkeypatch.setattr(
+            MarkdownEditorWidget,
+            "load_note",
+            lambda self, note_id, notes_dir: None,
+        )
+        monkeypatch.setattr(
+            QInputDialog,
+            "getText",
+            lambda *args, **kwargs: ("Concept A - renamed", True),
+        )
+
+        tab = NoteListEditorTab("concept_note")
+        qtbot.addWidget(tab)
+        tab.refresh()
+
+        with qtbot.waitSignal(tab.note_renamed, timeout=1000) as signal:
+            tab._rename_tab_note_by_index(0)
+
+        assert signal.args == [101]
+        assert notes[0].title == "Concept A - renamed"
+        assert "Concept A - renamed" in tab._doc_tabs.tabToolTip(0)
 
 
 class TestMarkdownSnippetDialogSmoke:

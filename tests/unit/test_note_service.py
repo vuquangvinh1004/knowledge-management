@@ -1,6 +1,8 @@
 """Unit tests cho NoteService."""
 from __future__ import annotations
 
+import uuid
+
 import pytest
 
 from core.services.note_service import NoteService
@@ -16,6 +18,8 @@ class TestCreateNote:
     def test_create_concept_note(self, service, db_session):
         note = service.create_note(title="Machine Learning", note_type="concept_note")
         assert note.id is not None
+        assert note.public_id
+        assert uuid.UUID(str(note.public_id)).version in (4, 7)
         assert note.slug == "machine-learning"
         assert note.note_type == "concept_note"
 
@@ -184,6 +188,36 @@ class TestDeleteNote:
             ).count()
         assert remains == 0
 
+    def test_restore_soft_deleted_note(self, service, db_session):
+        note = service.create_note(title="Restore Me", note_type="concept_note")
+        service.soft_delete(note.id)
+
+        service.restore(note.id)
+
+        restored = service.get_by_id(note.id)
+        assert restored.id == note.id
+
+    def test_mark_hard_deleted_sets_state_and_keeps_record(self, service, db_session, notes_dir):
+        from pathlib import Path
+        from core.storage.models import Note
+        from core.storage.session import get_session
+
+        note = service.create_note(title="Hard Mark", note_type="concept_note")
+        file_path = Path(note.file_path)
+        assert file_path.exists()
+
+        service.mark_hard_deleted(note.id, delete_file=True)
+
+        with pytest.raises(NoteNotFoundError):
+            service.get_by_id(note.id)
+
+        with get_session() as session:
+            db_note = session.get(Note, note.id)
+            assert db_note is not None
+            assert int(db_note.is_deleted) == 2
+
+        assert not file_path.exists()
+
 
 class TestNoteMaintenance:
     def test_normalize_source_note_titles_is_idempotent(self, service, db_session, sample_pdf_path):
@@ -200,7 +234,7 @@ class TestNoteMaintenance:
         assert changed == 1
 
         refreshed = service.get_by_id(note.id)
-        assert refreshed.title == "source - Lurthor & Luska (2023)"
+        assert refreshed.title == "Lurthor & Luska (2023)"
 
         changed_again = service.normalize_source_note_titles()
         assert changed_again == 0

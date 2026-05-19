@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import uuid
 
 import pytest
 
@@ -18,6 +19,8 @@ class TestImportSource:
     def test_import_valid_pdf(self, service, db_session, sample_pdf_path):
         source = service.import_source(sample_pdf_path, title="Test Paper")
         assert source.id is not None
+        assert source.public_id
+        assert uuid.UUID(str(source.public_id)).version in (4, 7)
         assert source.title == "Test Paper"
         assert source.file_hash
 
@@ -170,7 +173,7 @@ class TestSourceNoteTitleNaming:
             year="1994",
             fallback_filename="paper_abc",
         )
-        assert title == "source - Lent & Brown (1994)"
+        assert title == "Lent & Brown (1994)"
 
     def test_build_source_note_title_fallback_filename(self):
         title = SourceService.build_source_note_title(
@@ -186,7 +189,7 @@ class TestSourceNoteTitleNaming:
             year="1991",
             fallback_filename="ignored",
         )
-        assert title == "source - Ajzen (1991)"
+        assert title == "Ajzen (1991)"
 
     def test_build_source_note_title_three_authors_uses_et_al(self):
         title = SourceService.build_source_note_title(
@@ -194,4 +197,4 @@ class TestSourceNoteTitleNaming:
             year="2024",
             fallback_filename="ignored",
         )
-        assert title == "source - A et al. (2024)"
+        assert title == "A et al. (2024)"

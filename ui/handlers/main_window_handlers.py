@@ -11,15 +11,51 @@ from PySide6.QtWidgets import QDialog, QMessageBox, QVBoxLayout
 
 
 def open_import_dialog(window: Any) -> None:
-    """Mở dialog nhập PDF mới và điều hướng sang workspace nếu import thành công."""
+    """Mở dialog nhập PDF mới và chỉ cập nhật thư viện sau khi import thành công."""
     from ui.widgets.dialogs.import_source_dialog import ImportSourceDialog
 
     dlg = ImportSourceDialog(window)
     if dlg.exec() and dlg.imported_source_id is not None:
-        source_id = dlg.imported_source_id
         window._library_view.refresh()
         window._dashboard_view.refresh()
+        window._navigate_to(1)
+
+
+def start_create_source_note_flow(window: Any, library_index: int) -> None:
+    """Điều hướng sang Library ở chế độ chọn tài liệu để tạo source_note."""
+    window._navigate_to(library_index)
+    window._library_view.start_source_note_creation_mode()
+
+
+def create_source_note_from_library(window: Any, source_id: int) -> None:
+    """Tạo source_note tường minh cho source được chọn trong Library."""
+    from config.paths import ASSETS_DIR, NOTES_DIR
+    from core.services.note_service import NoteService
+    from core.services.workspace_orchestrator import WorkspaceOrchestrator
+
+    note_svc = NoteService(NOTES_DIR)
+    existing = note_svc.get_source_note(source_id)
+    if existing is not None:
+        QMessageBox.information(
+            window,
+            "Đã tồn tại source_note",
+            "Tài liệu này đã có source_note, không thể tạo mới trùng lặp.",
+        )
+        window._library_view.end_source_note_creation_mode()
         window._open_source_in_workspace(source_id)
+        return
+
+    try:
+        WorkspaceOrchestrator(notes_dir=NOTES_DIR, assets_dir=ASSETS_DIR).ensure_source_note(source_id)
+    except Exception as exc:  # noqa: BLE001
+        QMessageBox.critical(window, "Lỗi", f"Không thể tạo source_note:\n{exc}")
+        return
+
+    window._library_view.end_source_note_creation_mode()
+    window._library_view.refresh()
+    window._dashboard_view.refresh()
+    window._on_note_catalog_changed()
+    window._open_source_in_workspace(source_id)
 
 
 def open_source_in_workspace(window: Any, source_id: int, workspace_index: int) -> None:

@@ -271,12 +271,10 @@ class SourceDetailPanel(QWidget):
     Đặt ở phía phải của LibraryView qua QSplitter.
 
     Signals:
-        open_requested(int): Khi nhấn 'Ghi chú nguồn'.
         open_reference_requested(int): Khi nhấn 'Mở tài liệu'.
         refresh_requested: Khi metadata đã được cập nhật.
     """
 
-    open_requested = Signal(int)
     open_reference_requested = Signal(int)
     refresh_requested = Signal()
 
@@ -487,14 +485,8 @@ class SourceDetailPanel(QWidget):
         btn_lay.setContentsMargins(10, 8, 10, 8)
         btn_lay.setSpacing(6)
 
-        self._btn_open = QPushButton("Ghi chú nguồn")
-        self._btn_open.setObjectName("primary_button")
-        self._btn_open.setMinimumHeight(34)
-        self._btn_open.setEnabled(False)
-        self._btn_open.clicked.connect(self._on_open)
-        btn_lay.addWidget(self._btn_open)
-
         self._btn_open_reference = QPushButton("Mở tài liệu")
+        self._btn_open_reference.setObjectName("primary_button")
         self._btn_open_reference.setMinimumHeight(34)
         self._btn_open_reference.setEnabled(False)
         self._btn_open_reference.clicked.connect(self._on_open_reference)
@@ -523,7 +515,6 @@ class SourceDetailPanel(QWidget):
             self._stack.setCurrentIndex(0)
             return
         self._source_id = source_id
-        self._btn_open.setEnabled(True)
         self._btn_open_reference.setEnabled(True)
         self._populate(source)
         self._stack.setCurrentIndex(1)
@@ -532,7 +523,6 @@ class SourceDetailPanel(QWidget):
     def clear(self) -> None:
         """Xóa và hiển thị empty state."""
         self._source_id = None
-        self._btn_open.setEnabled(False)
         self._btn_open_reference.setEnabled(False)
         self._stack.setCurrentIndex(0)
 
@@ -627,10 +617,6 @@ class SourceDetailPanel(QWidget):
             "font-size: 36px; color: #8A94A8;"
             " background-color: #F7F9FD; border: 1px solid #D0D4E8; border-radius: 4px;"
         )
-
-    def _on_open(self) -> None:
-        if self._source_id is not None:
-            self.open_requested.emit(self._source_id)
 
     def _on_open_reference(self) -> None:
         if self._source_id is not None:

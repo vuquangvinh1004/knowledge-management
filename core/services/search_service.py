@@ -17,7 +17,7 @@ from core.search.fts_index import (
     search,
 )
 from core.search.query_parser import build_fts_query
-from core.storage.models import Extract, Link, Note
+from core.storage.models import Extract, Link, Note, Source
 from core.storage.session import get_session
 from core.storage.query_optimization import list_orphan_note_ids_efficient
 from core.utils.logger import get_logger
@@ -31,7 +31,9 @@ class SearchResult:
 
     entity_type: str       # 'note' | 'extract'
     entity_id: int
+    entity_public_id: str | None
     source_id: int | None
+    source_public_id: str | None
     title: str
     snippet: str
     extra: dict[str, Any] = field(default_factory=dict)
@@ -76,14 +78,37 @@ class SearchService:
             return []
 
         raw = search(self._db_path, fts_query, entity_type, source_id, limit)
+
+        note_ids = [int(r["entity_id"]) for r in raw if r["entity_type"] == "note"]
+        extract_ids = [int(r["entity_id"]) for r in raw if r["entity_type"] == "extract"]
+        source_ids = {
+            int(r["source_id"])
+            for r in raw
+            if r.get("source_id") not in (None, 0)
+        }
+        entity_public_id_map, source_public_id_map = self._build_public_id_maps(
+            note_ids=note_ids,
+            extract_ids=extract_ids,
+            source_ids=source_ids,
+        )
+
         results: list[SearchResult] = []
         for r in raw:
+            entity_type_val = r["entity_type"]
+            entity_id_val = int(r["entity_id"])
+            source_id_val = int(r["source_id"]) if r["source_id"] else None
             sr = SearchResult(
-                entity_type=r["entity_type"],
-                entity_id=int(r["entity_id"]),
-                source_id=int(r["source_id"]) if r["source_id"] else None,
+                entity_type=entity_type_val,
+                entity_id=entity_id_val,
+                entity_public_id=entity_public_id_map.get((entity_type_val, entity_id_val)),
+                source_id=source_id_val,
+                source_public_id=source_public_id_map.get(source_id_val) if source_id_val is not None else None,
                 title=r["title"] or "",
                 snippet=r["snippet"] or "",
+                extra={
+                    "entity_public_id": entity_public_id_map.get((entity_type_val, entity_id_val)),
+                    "source_public_id": source_public_id_map.get(source_id_val) if source_id_val is not None else None,
+                },
             )
             # Project mode filter: chỉ giữ note results thuộc project scope
             if project_note_ids is not None and sr.entity_type == "note":
@@ -91,6 +116,31 @@ class SearchService:
                     continue
             results.append(sr)
         return results
+
+    @staticmethod
+    def _build_public_id_maps(
+        *,
+        note_ids: list[int],
+        extract_ids: list[int],
+        source_ids: set[int],
+    ) -> tuple[dict[tuple[str, int], str], dict[int, str]]:
+        entity_map: dict[tuple[str, int], str] = {}
+        source_map: dict[int, str] = {}
+
+        with get_session() as session:
+            if note_ids:
+                for nid, public_id in session.query(Note.id, Note.public_id).filter(Note.id.in_(note_ids)).all():
+                    entity_map[("note", int(nid))] = str(public_id)
+
+            if extract_ids:
+                for eid, public_id in session.query(Extract.id, Extract.public_id).filter(Extract.id.in_(extract_ids)).all():
+                    entity_map[("extract", int(eid))] = str(public_id)
+
+            if source_ids:
+                for sid, public_id in session.query(Source.id, Source.public_id).filter(Source.id.in_(source_ids)).all():
+                    source_map[int(sid)] = str(public_id)
+
+        return entity_map, source_map
 
     # ------------------------------------------------------------------
     # Index management

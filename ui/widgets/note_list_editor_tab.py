@@ -1,7 +1,7 @@
 """Tab quản lý note theo loại với một khung ghi chú và document tabs."""
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QInputDialog,
+    QMenu,
 )
 
 from config.paths import ASSETS_DIR, NOTES_DIR
@@ -28,6 +29,7 @@ class NoteListEditorTab(QWidget):
     note_open_requested = Signal(int)
     note_deleted = Signal()
     note_created = Signal(int)
+    note_renamed = Signal(int)
 
     def __init__(self, note_type: str, parent=None) -> None:
         super().__init__(parent)
@@ -79,8 +81,10 @@ class NoteListEditorTab(QWidget):
         self._doc_tabs.setExpanding(False)
         self._doc_tabs.setMovable(False)
         self._doc_tabs.setUsesScrollButtons(True)
+        self._doc_tabs.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._doc_tabs.currentChanged.connect(self._on_tab_changed)
         self._doc_tabs.tabBarClicked.connect(self._on_tab_clicked)
+        self._doc_tabs.customContextMenuRequested.connect(self._on_doc_tabs_context_menu)
         self._setup_doc_tabs_style()
         layout.addWidget(self._doc_tabs)
 
@@ -241,6 +245,66 @@ class NoteListEditorTab(QWidget):
                 self._load_note_for_index(0)
             else:
                 self._editor.unload_note()
+
+    def _on_doc_tabs_context_menu(self, pos) -> None:
+        """Mở context menu cho tab note: hỗ trợ Sửa tên như worksheet trong Excel."""
+        idx = self._doc_tabs.tabAt(pos)
+        if idx < 0 or idx >= len(self._tab_note_ids):
+            return
+
+        note_id = self._tab_note_ids[idx]
+        if note_id is None:
+            return
+
+        # Đồng bộ tab được tác động trước khi mở menu, để hành vi giống tab worksheet.
+        if idx != self._doc_tabs.currentIndex():
+            self._set_current_tab(idx)
+            self._load_note_for_index(idx)
+
+        menu = QMenu(self)
+        action_rename = menu.addAction("Sửa tên")
+        chosen = menu.exec(self._doc_tabs.mapToGlobal(pos))
+        if chosen == action_rename:
+            self._rename_tab_note_by_index(idx)
+
+    def _rename_tab_note_by_index(self, idx: int) -> None:
+        """Đổi tên note từ tab context menu và đồng bộ ngay toàn ứng dụng."""
+        if idx < 0 or idx >= len(self._tab_note_ids):
+            return
+
+        note_id = self._tab_note_ids[idx]
+        if note_id is None:
+            return
+
+        note_row = next((n for n in self._filtered_rows if int(n.id) == int(note_id)), None)
+        current_title = str(getattr(note_row, "title", "") or "")
+
+        new_title, ok = QInputDialog.getText(
+            self,
+            "Sửa tên ghi chú",
+            "Nhập tên mới:",
+            text=current_title,
+        )
+        if not ok:
+            return
+
+        normalized = new_title.strip()
+        if not normalized:
+            QMessageBox.warning(self, "Sửa tên", "Tên ghi chú không được để trống.")
+            return
+        if normalized == current_title:
+            return
+
+        try:
+            NoteService(NOTES_DIR).update_title(int(note_id), normalized)
+            self.refresh()
+            if int(note_id) in self._tab_note_ids:
+                new_idx = self._tab_note_ids.index(int(note_id))
+                self._set_current_tab(new_idx)
+                self._load_note_for_index(new_idx)
+            self.note_renamed.emit(int(note_id))
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Lỗi", f"Không thể sửa tên ghi chú:\n{exc}")
 
     def _quick_create_note(self) -> int | None:
         """Tạo note mới trực tiếp, template hiển thị ở editor thay vì popup template."""

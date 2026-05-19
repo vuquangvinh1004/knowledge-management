@@ -42,6 +42,8 @@ class NoteManagementShellView(QWidget):
     note_open_requested = Signal(int)
     note_deleted = Signal()
     note_created = Signal(int)
+    note_renamed = Signal(int)
+    create_note_requested = Signal()
     library_requested = Signal()
 
     def __init__(self, parent=None) -> None:
@@ -75,10 +77,13 @@ class NoteManagementShellView(QWidget):
         self._tabs.addTab(self._synthesis_tab, "GC Tổng hợp")
         self._tabs.addTab(self._board_tab, "GC Board")
 
-        self._source_workspace.library_requested.connect(self.library_requested.emit)
+        self._source_workspace.create_note_requested.connect(self.create_note_requested.emit)
         self._concept_tab.note_deleted.connect(self.note_deleted)
         self._synthesis_tab.note_deleted.connect(self.note_deleted)
         self._board_tab.note_deleted.connect(self.note_deleted)
+        self._concept_tab.note_renamed.connect(self.note_renamed)
+        self._synthesis_tab.note_renamed.connect(self.note_renamed)
+        self._board_tab.note_renamed.connect(self.note_renamed)
 
         layout.addWidget(self._tabs, stretch=1)
 

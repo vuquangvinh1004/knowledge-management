@@ -31,6 +31,7 @@ from core.storage.query_optimization import (
     list_notes_for_management_efficient,
 )
 from core.services.note_templates import build_note_template, get_note_title_warnings
+from core.services.source_service import SourceService
 from core.utils.constants import NOTE_TYPES
 from core.utils.exceptions import NoteNotFoundError, PKMError
 from core.utils.helpers import slugify
@@ -162,6 +163,9 @@ class NoteService:
                     "Mỗi source chỉ được có một source_note."
                 )
 
+            # Rule: source_code chỉ được sinh khi người dùng tạo source_note.
+            SourceService().ensure_source_code(source_id)
+
         slug = self._unique_slug(title)
         note_file = self._notes_dir / f"{slug}.md"
         resolved_content = initial_content if initial_content != "" else build_note_template(note_type, title)
@@ -232,6 +236,7 @@ class NoteService:
             return [
                 {
                     "note_id": item.note_id,
+                    "note_public_id": item.note_public_id,
                     "title": item.title,
                     "note_type": item.note_type,
                     "source_id": item.source_id,
@@ -429,7 +434,7 @@ class NoteService:
     # ------------------------------------------------------------------
 
     def soft_delete(self, note_id: int) -> None:
-        """Soft-delete note (giữ file và record DB)."""
+        """Soft-delete note (xóa tạm, giữ file và record DB)."""
         with get_session() as session:
             note = session.get(Note, note_id)
             if note is None:
@@ -437,6 +442,43 @@ class NoteService:
             note.is_deleted = 1
             note.updated_at = datetime.now(timezone.utc)
         logger.info(f"Soft-delete note id={note_id}")
+
+    def restore(self, note_id: int) -> None:
+        """Khôi phục note từ trạng thái xóa tạm (is_deleted = 1)."""
+        with get_session() as session:
+            note = session.get(Note, note_id)
+            if note is None:
+                raise NoteNotFoundError(f"Không tìm thấy note id={note_id}.")
+            if int(note.is_deleted or 0) != 1:
+                raise PKMError("Chỉ có thể khôi phục note ở trạng thái xóa tạm.")
+            note.is_deleted = 0
+            note.updated_at = datetime.now(timezone.utc)
+        logger.info(f"Restore soft-deleted note id={note_id}")
+
+    def mark_hard_deleted(self, note_id: int, delete_file: bool = True) -> None:
+        """Đánh dấu note ở trạng thái xóa cứng (is_deleted = 2), chưa purge record DB.
+
+        Trạng thái này dùng cho workflow 2 bước:
+        - Bước 1: xóa cứng logic (chuyển đỏ trong UI)
+        - Bước 2: xóa hoàn toàn khỏi DB (hard_delete)
+        """
+        with get_session() as session:
+            note = session.get(Note, note_id)
+            if note is None:
+                raise NoteNotFoundError(f"Không tìm thấy note id={note_id}.")
+            file_path = Path(note.file_path)
+
+            # Dọn links để note đỏ không còn tham gia graph.
+            session.query(Link).filter(
+                (Link.from_note_id == note_id) | (Link.to_note_id == note_id)
+            ).delete(synchronize_session=False)
+
+            note.is_deleted = 2
+            note.updated_at = datetime.now(timezone.utc)
+
+        if delete_file and file_path.exists():
+            file_path.unlink(missing_ok=True)
+        logger.info(f"Mark hard-deleted note id={note_id}")
 
     def hard_delete(self, note_id: int, delete_file: bool = True) -> None:
         """
@@ -517,11 +559,15 @@ class NoteService:
 
                 effective_authors = str(meta.get("author") or source.authors or "").strip() or None
                 effective_year = str(meta.get("year") or source.year or "").strip() or None
+                fallback_title = self._normalize_note_title_for_catalog(
+                    "source_note",
+                    str(note.title or ""),
+                )
 
                 new_title = SourceService.build_source_note_title(
                     authors=effective_authors,
                     year=effective_year,
-                    fallback_filename=note.title,
+                    fallback_filename=fallback_title,
                 )
                 if new_title != note.title:
                     note.title = new_title
@@ -573,7 +619,7 @@ class NoteService:
 
             stale_note_ids = {
                 int(n.id)
-                for n in session.query(Note).filter(Note.is_deleted == 1).all()
+                for n in session.query(Note).filter(Note.is_deleted != 0).all()
                 if n.id is not None
             }
             if stale_note_ids:
@@ -705,6 +751,11 @@ class NoteService:
         """Chuẩn hóa title bị chèn prefix hiển thị từ popup cũ."""
         t = title.strip()
         lower = t.lower()
+
+        if note_type == "source_note":
+            if lower.startswith("source - "):
+                return t[len("source - "):].strip()
+            return t
 
         if note_type == "concept_note":
             if lower.startswith("concept - "):

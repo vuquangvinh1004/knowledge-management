@@ -17,24 +17,20 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from config.paths import ASSETS_DIR, NOTES_DIR
-from core.services.note_service import NoteService
 from core.services.source_service import SourceService
-from core.services.workspace_orchestrator import WorkspaceOrchestrator
 from core.utils.logger import get_logger
 
 logger = get_logger()
 
 
 class ImportSourceDialog(QDialog):
-    """Dialog nhập PDF và tạo `source_note` ngay tại bước import."""
+    """Dialog nhập PDF vào thư viện (chỉ lưu source thô)."""
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Nhập tài liệu PDF")
         self.setMinimumWidth(560)
         self._imported_source_id: int | None = None
-        self._source_note_title_overridden = False
         self._build_ui()
 
     @property
@@ -95,18 +91,7 @@ class ImportSourceDialog(QDialog):
         self._edit_doi.setPlaceholderText("DOI (tùy chọn)")
         form.addRow("DOI:", self._edit_doi)
 
-        self._edit_source_note_title = QLineEdit()
-        self._edit_source_note_title.setPlaceholderText("source - {Tác giả} ({Năm})")
-        self._edit_source_note_title.textEdited.connect(self._on_source_note_title_edited)
-        form.addRow("Tiêu đề source_note:", self._edit_source_note_title)
-
-        self._edit_authors.textChanged.connect(self._refresh_suggested_source_note_title)
-        self._edit_year.textChanged.connect(self._refresh_suggested_source_note_title)
-
-        self._lbl_hint = QLabel(
-            "Hệ thống tạo source_note ngay khi import. "
-            "Bạn có thể chỉnh tiêu đề source_note trước khi lưu."
-        )
+        self._lbl_hint = QLabel("Import chỉ thêm tài liệu vào Thư viện nguồn. source_note sẽ tạo ở thẻ GC Nguồn.")
         self._lbl_hint.setWordWrap(True)
         self._lbl_hint.setObjectName("import_hint_label")
         form.addRow("", self._lbl_hint)
@@ -133,7 +118,6 @@ class ImportSourceDialog(QDialog):
             return
 
         pdf_path = Path(path)
-        self._source_note_title_overridden = False
         self._edit_path.setText(path)
         try:
             meta = SourceService.extract_pdf_metadata(pdf_path)
@@ -147,24 +131,6 @@ class ImportSourceDialog(QDialog):
         if not self._edit_year.text().strip() and meta.get("year"):
             self._edit_year.setText(meta["year"])
 
-        self._refresh_suggested_source_note_title()
-
-    def _on_source_note_title_edited(self) -> None:
-        self._source_note_title_overridden = True
-
-    def _refresh_suggested_source_note_title(self) -> None:
-        if self._source_note_title_overridden:
-            return
-
-        path_str = self._edit_path.text().strip()
-        fallback = Path(path_str).stem if path_str else "source_note"
-        generated = SourceService.build_source_note_title(
-            authors=self._edit_authors.text().strip() or None,
-            year=self._edit_year.text().strip() or None,
-            fallback_filename=fallback,
-        )
-        self._edit_source_note_title.setText(generated)
-
     def _do_import(self) -> None:
         path_str = self._edit_path.text().strip()
         if not path_str:
@@ -172,14 +138,6 @@ class ImportSourceDialog(QDialog):
             return
 
         pdf_path = Path(path_str)
-        source_note_title = self._edit_source_note_title.text().strip()
-        if not source_note_title:
-            source_note_title = SourceService.build_source_note_title(
-                authors=self._edit_authors.text().strip() or None,
-                year=self._edit_year.text().strip() or None,
-                fallback_filename=pdf_path.stem,
-            )
-
         svc = SourceService()
         try:
             source = svc.import_source(
@@ -194,29 +152,11 @@ class ImportSourceDialog(QDialog):
             if lang:
                 svc.update_metadata(source.id, language=lang)
 
-            source_note, _notice = WorkspaceOrchestrator(
-                notes_dir=NOTES_DIR,
-                assets_dir=ASSETS_DIR,
-            ).ensure_source_note(
-                source.id,
-                preferred_title=source_note_title,
-            )
-            note_svc = NoteService(NOTES_DIR)
-            note_svc.update_meta(
-                source_note.id,
-                {
-                    "author": self._edit_authors.text().strip() or source.authors or "",
-                    "year": self._edit_year.text().strip() or source.year or "",
-                    "source_type": "pdf",
-                },
-            )
-
             self._imported_source_id = source.id
             logger.info(
-                "Nhập source thành công: id=%s, source_title=%r, source_note_title=%r",
+                "Nhập source thành công (không tạo source_note): id=%s, source_title=%r",
                 source.id,
                 source.title,
-                source_note_title,
             )
             self.accept()
         except Exception as exc:  # noqa: BLE001
