@@ -111,7 +111,7 @@ class _MarkdownSyntaxHighlighter(QSyntaxHighlighter):
 
         self._blockquote_line_format = QTextCharFormat()
         self._blockquote_line_format.setForeground(QColor("#1F3B73"))
-        self._blockquote_line_format.setBackground(QColor("#DCFCE7"))
+        self._blockquote_line_format.setBackground(QColor("#F8EEDB"))
 
         self._table_line_format = QTextCharFormat()
         self._table_line_format.setBackground(QColor("#ECEFF3"))

@@ -364,6 +364,12 @@ Deliverable: cải thiện tính ổn định thao tác xóa cứng và trải n
 | Fix quote/blockquote background khi tràn dòng | Done | Cao | Thêm background color (#EFF4F9) cho blockquote line format trong markdown editor |
 | Thêm button "Tùy chỉnh" tiêu chí bảng | Done | Cao | New dialog `BoardCriteriaManagerDialog` với CRUD + drag-reorder; tích hợp toolbar BoardView |
 | Xác thực CRUD tiêu chí + cascade delete | Done | Cao | create_column + delete_column với cascade xóa ô; list_columns giữ thứ tự |
+| Migration 0010: thêm `board_columns.is_visible` | Done | Cao | Lưu trạng thái checkbox ẩn/hiện tiêu chí, không bị reset sau restart |
+| Checkbox hiển thị tiêu chí trong dialog Tùy chỉnh | Done | Cao | Tích chọn = hiển thị trên bảng; bỏ chọn = ẩn khỏi bảng |
+| BoardView chỉ hiển thị cột đang bật | Done | Cao | Dùng `list_columns(visible_only=True)` thay vì luôn render toàn bộ cột |
+| Bảo toàn dữ liệu tiêu chí hệ thống khi "xóa" | Done | Cao | Tiêu chí hệ thống không xóa cứng; được chuyển sang hidden để tránh mất dữ liệu |
+| Loại bỏ triệt để tiêu chí không bắt buộc | Done | Cao | Xóa khỏi bộ tiêu chí hệ thống: `ID`, `Mã nghiên cứu`, `Hướng tác động`, `Effect size`, `Loại effect size`, `SE/SD`, `CI thấp`, `CI cao`, `p-value`, `Chất lượng nghiên cứu`, `Ghi chú mã hóa`, và 3 link-note |
+| Đồng bộ quotes Metadata trong source_note template | Done | Cao | Template `## Metadata` chỉ còn quotes của tiêu chí hệ thống bắt buộc |
 | Test hồi quy UI + unit | Done | Cao | 307 unit tests pass; 4 board smoke tests pass |
 
 Deliverable: bảng tổng hợp hiển thị đầy đủ nội dung, quote blocks có background nhất quán khi tràn dòng, người dùng quản lý tiêu chí linh hoạt hơn.

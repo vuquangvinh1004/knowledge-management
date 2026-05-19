@@ -288,6 +288,7 @@ class BoardColumn(Base):
     board_id = Column(Integer, ForeignKey("boards.id", ondelete="CASCADE"), nullable=False)
     label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
+    is_visible = Column(Boolean, nullable=False, default=True)
 
     board = relationship("Board", back_populates="columns")
     cells = relationship("BoardCell", back_populates="col", cascade="all, delete-orphan")

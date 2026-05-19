@@ -614,6 +614,7 @@ id                INTEGER PRIMARY KEY AUTOINCREMENT
 board_id          INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE
 label             TEXT NOT NULL
 sort_order        INTEGER NOT NULL DEFAULT 0
+is_visible        BOOLEAN NOT NULL DEFAULT 1
 ```
 
 #### board_cells (không đổi)
@@ -646,21 +647,24 @@ Quy tắc:
 
 ### 7.4. Board templates chuẩn (Phase 6)
 
-Board phan tich chinh trong tab Bảng nghiên cứu được chot o che do meta-analysis full 34 cot.
-Khong con menu "Khoi tao" trong BoardView; bang se tu dong dam bao full 34 cot va dong bo 1 hang = 1 source_note.
+Board phan tich chinh trong tab Bảng nghiên cứu được chot o che do meta-analysis full 30 cot.
+Khong con menu "Khoi tao" trong BoardView; bang se tu dong dam bao full 30 cot va dong bo 1 hang = 1 source_note.
 
-#### Template "Đầy đủ" (meta_analysis — 34 cột)
+Tu 2026-05-20, cau hinh hien/an tieu chi duoc luu tai `board_columns.is_visible` va dieu khien tu dialog "Tuy chinh" bang checkbox.
 
-ID, Ma nghien cuu, Tac gia, Nam, Tieu de, Quoc gia/Boi canh, Loai nguon, Muc tieu nghien cuu, Cau hoi nghien cuu, Ly thuyet/khung phan tich, Chu de chinh, Bien doc lap, Bien phu thuoc, Bien trung gian/dieu tiet, Doi tuong nghien cuu, Co mau, Phuong phap nghien cuu, Cong cu phan tich, Thiet ke nghien cuu, Thang do/chi bao, Ket qua chinh, Huong tac dong, Effect size, Loai effect size, SE/SD, CI thap, CI cao, p-value, Chat luong nghien cuu, Han che, Ghi chu ma hoa, Link source_note, Link concept_note, Link synthesis_note
+#### Template "Đầy đủ" (meta_analysis — 30 cột)
+
+Ma nghien cuu, Tac gia, Nam, Tieu de, Quoc gia/Boi canh, Loai nguon, Muc tieu nghien cuu, Cau hoi nghien cuu, Ly thuyet/khung phan tich, Chu de chinh, Bien doc lap, Bien phu thuoc, Bien trung gian/dieu tiet, Doi tuong nghien cuu, Co mau, Phuong phap nghien cuu, Cong cu phan tich, Thiet ke nghien cuu, Thang do/chi bao, Ket qua chinh, Huong tac dong, Effect size, Loai effect size, SE/SD, CI thap, CI cao, p-value, Chat luong nghien cuu, Han che, Ghi chu ma hoa
 
 `board_note` van la note type hop le nhung duoc tao/quan ly o khu vuc tab note (GC Board), khong tao truc tiep tu BoardView.
 
 **Quy tắc mới của BoardView:**
 
-- Luon su dung full 34 cot meta-analysis.
+- Luon su dung full 30 cot meta-analysis lam bo tieu chi he thong.
 - Moi source_note toi da 1 hang trong cung board (`board_rows.source_note_id` + unique theo `board_id`).
 - BoardView co nut "Dong bo nguon" de cap nhat danh sach hang tu source_note theo scope hien tai.
-- Du lieu legacy (hang/cot cu) duoc giu de tranh mat du lieu, nhung BoardView chi hien thi bo 34 cot chuan va cac hang da gan `source_note_id`.
+- Nguoi dung co the bat/tat hien thi tung tieu chi bang checkbox; trang thai duoc luu o `board_columns.is_visible`.
+- Du lieu legacy (hang/cot cu) duoc giu de tranh mat du lieu, nhung BoardView chi hien thi bo tieu chi dang bat hien thi va cac hang da gan `source_note_id`.
 
 ---
 

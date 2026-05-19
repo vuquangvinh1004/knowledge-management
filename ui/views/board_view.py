@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 
 from ui.widgets.empty_state import EmptyStateWidget
 from ui.widgets.dialogs.board_criteria_manager_dialog import BoardCriteriaManagerDialog
+from core.utils.constants import BOARD_META_ANALYSIS_CRITERIA
 from core.utils.logger import get_logger
 
 logger = get_logger()
@@ -159,7 +160,8 @@ class BoardView(QWidget):
             except Exception:
                 self._active_board_id = svc.get_default_board().id
 
-        self._cols = svc.ensure_full_meta_columns(board_id=self._active_board_id)
+        svc.ensure_full_meta_columns(board_id=self._active_board_id)
+        self._cols = svc.list_columns(board_id=self._active_board_id, visible_only=True)
         self._rows = svc.sync_rows_with_source_notes(
             board_id=self._active_board_id,
             project_id=self._project_id,
@@ -352,68 +354,35 @@ class BoardView(QWidget):
 
     def _open_criteria_manager(self) -> None:
         """Mở dialog quản lý tiêu chí bảng."""
-        logger.debug(f"_open_criteria_manager called, _active_board_id={self._active_board_id}")
-        
         svc = self._get_service()
         if self._active_board_id is None:
-            logger.warning("No active board ID set")
             QMessageBox.warning(self, "Lỗi", "Chưa có board nào được chọn!")
             return
 
-        board = svc.get_board(self._active_board_id)
-        if board is None:
-            logger.warning(f"Board {self._active_board_id} not found")
-            QMessageBox.warning(self, "Lỗi", "Không tìm thấy board!")
-            return
+        svc.get_board(self._active_board_id)
+        svc.ensure_full_meta_columns(board_id=self._active_board_id)
 
-        logger.debug(f"Loading criteria for board {self._active_board_id}")
-        # Lấy danh sách tiêu chí hiện tại từ board columns
-        current_criteria = [col.label for col in svc.list_columns(self._active_board_id)]
-        logger.debug(f"Current criteria: {current_criteria}")
+        system_labels = set(BOARD_META_ANALYSIS_CRITERIA)
+        criteria = [
+            {
+                "id": col.id,
+                "label": col.label,
+                "visible": bool(getattr(col, "is_visible", True)),
+                "locked": col.label in system_labels,
+            }
+            for col in svc.list_columns(self._active_board_id)
+        ]
 
-        dlg = BoardCriteriaManagerDialog(current_criteria, self)
-        logger.debug("Dialog created, executing...")
-        
+        dlg = BoardCriteriaManagerDialog(criteria, self)
         if dlg.exec():
-            new_criteria = dlg.get_criteria()
-            logger.debug(f"Dialog accepted with new criteria: {new_criteria}")
-
-            # Xác định các tiêu chí bị thêm, sửa, xóa
-            # Lưu ý: Điều này là đơn giản - chỉ support add/delete column, không support rename
-            # Nếu tương lai cần rename, sẽ cần track mapping cũ->mới
-
-            deleted_criteria = set(current_criteria) - set(new_criteria)
-            added_criteria = set(new_criteria) - set(current_criteria)
-            reordered = new_criteria  # Danh sách mới đã được sắp xếp
-
-            logger.debug(f"Deleted: {deleted_criteria}, Added: {added_criteria}")
+            configurations = dlg.get_configurations()
 
             try:
-                # Xóa các tiêu chí bị xóa (xóa column và cascade ô)
-                for criterion in deleted_criteria:
-                    col = next(
-                        (c for c in svc.list_columns(self._active_board_id) if c.label == criterion),
-                        None,
-                    )
-                    if col:
-                        logger.debug(f"Deleting column {criterion} (id={col.id})")
-                        svc.delete_column(col.id, self._active_board_id)
-
-                # Thêm tiêu chí mới
-                for criterion in added_criteria:
-                    logger.debug(f"Creating column {criterion}")
-                    svc.create_column(criterion, self._active_board_id)
-
-                # Cập nhật thứ tự tiêu chí (nếu cần)
-                # Lưu ý: Hiện tại, order được lưu implicit qua position trong list_columns
-                # Nếu muốn explicit order, cần thêm column `position` vào model
-
+                svc.apply_column_configuration(self._active_board_id, configurations)
                 QMessageBox.information(self, "Thành công", "Tiêu chí đã được cập nhật.")
                 self.refresh()
             except Exception as exc:
                 logger.exception("Error updating board criteria")
                 QMessageBox.warning(self, "Lỗi", f"Không thể cập nhật tiêu chí: {exc}")
-        else:
-            logger.debug("Dialog rejected/closed")
 
 

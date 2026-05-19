@@ -812,7 +812,7 @@ class TestBoardViewSmoke:
         view.refresh()
         assert view._empty_state.isHidden()
         assert not view._table.isHidden()
-        assert len(view._cols) == 30
+        assert len(view._cols) == 20
         assert all(getattr(r, "source_note_id", None) is not None for r in view._rows)
         assert view._table.rowCount() == len(view._cols)
         assert view._table.columnCount() == len(view._rows)
@@ -828,10 +828,16 @@ class TestBoardViewSmoke:
         qtbot.addWidget(view)
         view.refresh()
         assert view._active_board_id == default_board.id
-        assert len(view._cols) == 30
+        assert len(view._cols) == 20
 
-    def test_customize_button_exists_and_clickable(self, qtbot, db_session):
+    def test_customize_button_exists_and_clickable(self, qtbot, db_session, monkeypatch):
         from ui.views.board_view import BoardView
+        from ui.widgets.dialogs.board_criteria_manager_dialog import BoardCriteriaManagerDialog
+
+        def _fake_exec(self):
+            return int(self.DialogCode.Rejected)
+
+        monkeypatch.setattr(BoardCriteriaManagerDialog, "exec", _fake_exec)
 
         view = BoardView()
         qtbot.addWidget(view)
@@ -841,8 +847,8 @@ class TestBoardViewSmoke:
         assert view._btn_customize is not None
         assert view._btn_customize.text() == "Tùy chỉnh"
         
-        # Button should be clickable without raising exception
-        # (dialog opens modally, so we just verify the click doesn't crash)
+        # Button should be clickable without raising exception.
+        # Dialog đã được monkeypatch để không block event loop của test.
         view._btn_customize.click()
         assert True  # If we get here, no exception was raised
 

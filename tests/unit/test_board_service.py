@@ -94,6 +94,65 @@ class TestBoardColumns:
         assert [c.label for c in cols_c] == ["C-1"]
         assert [c.label for c in cols_d] == ["D-1"]
 
+    def test_list_columns_visible_only_filters_hidden_columns(self, board_service):
+        board = board_service.get_default_board()
+        board_service.ensure_full_meta_columns(board_id=board.id)
+
+        all_cols = board_service.list_columns(board_id=board.id)
+        assert len(all_cols) == 20
+
+        hidden_label = "Tác giả"
+        configs = [
+            {
+                "id": c.id,
+                "label": c.label,
+                "visible": c.label != hidden_label,
+            }
+            for c in all_cols
+        ]
+        board_service.apply_column_configuration(board.id, configs)
+
+        visible_cols = board_service.list_columns(board_id=board.id, visible_only=True)
+        assert all(c.label != hidden_label for c in visible_cols)
+        assert len(visible_cols) == 19
+
+    def test_ensure_full_meta_columns_removes_deprecated_criteria(self, board_service):
+        board = board_service.get_default_board()
+        board_service.create_column("ID", board_id=board.id)
+        board_service.create_column("Link source_note", board_id=board.id)
+        board_service.create_column("Ghi chú mã hóa", board_id=board.id)
+
+        board_service.ensure_full_meta_columns(board_id=board.id)
+        labels = [c.label for c in board_service.list_columns(board_id=board.id)]
+
+        assert "ID" not in labels
+        assert "Link source_note" not in labels
+        assert "Ghi chú mã hóa" not in labels
+
+    def test_hidden_meta_column_persists_after_ensure_full_meta_columns(self, board_service):
+        board = board_service.get_default_board()
+        cols = board_service.ensure_full_meta_columns(board_id=board.id)
+
+        configs = [
+            {
+                "id": c.id,
+                "label": c.label,
+                "visible": c.label != "Hạn chế",
+            }
+            for c in cols
+        ]
+        board_service.apply_column_configuration(board.id, configs)
+
+        # Mô phỏng mở lại app: ensure_full_meta_columns chạy lại.
+        board_service.ensure_full_meta_columns(board_id=board.id)
+
+        visible_cols = board_service.list_columns(board_id=board.id, visible_only=True)
+        all_cols = board_service.list_columns(board_id=board.id)
+
+        assert all(c.label != "Hạn chế" for c in visible_cols)
+        hidden = next(c for c in all_cols if c.label == "Hạn chế")
+        assert hidden.is_visible is False
+
 
 class TestBoardCells:
     def test_update_cell_creates_new(self, board_service):
@@ -163,7 +222,7 @@ class TestBoards:
 
 
 class TestBoardTemplates:
-    def test_create_from_template_meta_analysis_has_30_columns(self, board_service, notes_dir):
+    def test_create_from_template_meta_analysis_has_20_columns(self, board_service, notes_dir):
         board, note_id = board_service.create_from_template(
             "meta_analysis",
             "Meta Full",
@@ -173,7 +232,7 @@ class TestBoardTemplates:
         assert board is not None
         assert note_id is None
         cols = board_service.list_columns(board_id=board.id)
-        assert len(cols) == 30
+        assert len(cols) == 20
 
     def test_create_from_template_literature_has_16_columns(self, board_service, notes_dir):
         board, note_id = board_service.create_from_template(
@@ -210,9 +269,9 @@ class TestBoardTemplates:
 
 
 class TestBoardSourceNoteSync:
-    def test_ensure_full_meta_columns_returns_30(self, board_service):
+    def test_ensure_full_meta_columns_returns_20(self, board_service):
         cols = board_service.ensure_full_meta_columns()
-        assert len(cols) == 30
+        assert len(cols) == 20
 
     def test_sync_rows_with_source_notes_creates_linked_rows(self, board_service, notes_dir):
         from datetime import datetime, timezone
@@ -241,6 +300,51 @@ class TestBoardSourceNoteSync:
 
         rows = board_service.sync_rows_with_source_notes()
         assert any(int(r.source_note_id or 0) == int(note.id) for r in rows)
+
+    def test_cleanup_deprecated_source_note_metadata_removes_removed_callouts(self, board_service, notes_dir):
+        from datetime import datetime, timezone
+
+        from core.services.note_service import NoteService
+        from core.storage.models import Source
+        from core.storage.session import get_session
+
+        with get_session() as session:
+            src = Source(
+                file_path="D:/cleanup-source.pdf",
+                file_hash="cleanup_source_hash",
+                title="Cleanup Source",
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
+            )
+            session.add(src)
+            session.flush()
+            source_id = int(src.id)
+
+        content = (
+            "# source - Cleanup\n\n"
+            "## Metadata\n"
+            "> [!TÁC GIẢ]\n"
+            "> Nguyen Van A\n\n"
+            "> [!MÃ NGHIÊN CỨU]\n"
+            "> R-001\n\n"
+            "> [!P-VALUE]\n"
+            "> 0.03\n"
+        )
+
+        note = NoteService(notes_dir).create_note(
+            title="source - Cleanup",
+            note_type="source_note",
+            source_id=source_id,
+            initial_content=content,
+        )
+
+        changed = board_service.cleanup_deprecated_source_note_metadata()
+        assert changed >= 1
+
+        cleaned = NoteService(notes_dir).read_content(note.id)
+        assert "> [!TÁC GIẢ]" in cleaned
+        assert "> [!MÃ NGHIÊN CỨU]" not in cleaned
+        assert "> [!P-VALUE]" not in cleaned
 
     def test_list_source_note_rows_only_returns_linked_rows(self, board_service, notes_dir):
         from datetime import datetime, timezone

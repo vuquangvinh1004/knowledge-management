@@ -72,6 +72,16 @@ class TestReadWriteContent:
         assert "## Metadata" in content
         assert "> [!TÁC GIẢ]" in content
         assert "> [!NĂM]" in content
+        assert "> [!MÃ NGHIÊN CỨU]" not in content
+        assert "> [!HƯỚNG TÁC ĐỘNG]" not in content
+        assert "> [!EFFECT SIZE]" not in content
+        assert "> [!LOẠI EFFECT SIZE]" not in content
+        assert "> [!SE/SD]" not in content
+        assert "> [!CI THẤP]" not in content
+        assert "> [!CI CAO]" not in content
+        assert "> [!P-VALUE]" not in content
+        assert "> [!CHẤT LƯỢNG NGHIÊN CỨU]" not in content
+        assert "> [!GHI CHÚ MÃ HÓA]" not in content
         assert "Thông tin tiêu chí." not in content
 
 

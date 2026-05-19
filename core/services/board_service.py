@@ -21,6 +21,22 @@ from core.utils.logger import get_logger
 logger = get_logger()
 
 META_ANALYSIS_COLUMNS = list(BOARD_META_ANALYSIS_CRITERIA)
+REMOVED_META_ANALYSIS_COLUMNS = {
+    "ID",
+    "Mã nghiên cứu",
+    "Hướng tác động",
+    "Effect size",
+    "Loại effect size",
+    "SE/SD",
+    "CI thấp",
+    "CI cao",
+    "p-value",
+    "Chất lượng nghiên cứu",
+    "Ghi chú mã hóa",
+    "Link source_note",
+    "Link concept_note",
+    "Link synthesis_note",
+}
 
 LITERATURE_COLUMNS = [
     "Mã nghiên cứu",
@@ -219,12 +235,30 @@ class BoardService:
                 .order_by(BoardColumn.sort_order, BoardColumn.id)
                 .all()
             )
+
+            # Dọn dẹp triệt để các tiêu chí đã bị loại khỏi chuẩn hệ thống.
+            for col in existing:
+                if str(col.label) in REMOVED_META_ANALYSIS_COLUMNS:
+                    session.delete(col)
+
+            session.flush()
+            existing = (
+                session.query(BoardColumn)
+                .filter(BoardColumn.board_id == resolved_board_id)
+                .order_by(BoardColumn.sort_order, BoardColumn.id)
+                .all()
+            )
             by_label: dict[str, BoardColumn] = {str(col.label): col for col in existing}
 
             for idx, label in enumerate(META_ANALYSIS_COLUMNS):
                 col = by_label.get(label)
                 if col is None:
-                    col = BoardColumn(board_id=resolved_board_id, label=label, sort_order=idx)
+                    col = BoardColumn(
+                        board_id=resolved_board_id,
+                        label=label,
+                        sort_order=idx,
+                        is_visible=True,
+                    )
                     session.add(col)
                 else:
                     col.sort_order = idx
@@ -320,6 +354,52 @@ class BoardService:
     @staticmethod
     def _normalize_meta_key(text: str) -> str:
         return " ".join(str(text or "").strip().upper().split())
+
+    @classmethod
+    def _strip_deprecated_metadata_blocks(cls, markdown: str) -> tuple[str, int]:
+        """Xóa các callout metadata deprecated khỏi markdown source_note.
+
+        Chỉ xóa block quote theo cấu trúc:
+        > [!TIÊU CHÍ]
+        > giá trị...
+        """
+        lines = markdown.splitlines()
+        removed = 0
+        out: list[str] = []
+        idx = 0
+        removed_keys = {cls._normalize_meta_key(k) for k in REMOVED_META_ANALYSIS_COLUMNS}
+
+        while idx < len(lines):
+            line = lines[idx]
+            callout = _META_CALLOUT_RE.match(line)
+            if not callout:
+                out.append(line)
+                idx += 1
+                continue
+
+            raw_key = cls._normalize_meta_key(callout.group(1))
+            if raw_key not in removed_keys:
+                out.append(line)
+                idx += 1
+                continue
+
+            # Bỏ cả block của tiêu chí deprecated cho tới trước callout/heading kế tiếp.
+            removed += 1
+            idx += 1
+            while idx < len(lines):
+                current = lines[idx]
+                if current.startswith("## "):
+                    break
+                if _META_CALLOUT_RE.match(current):
+                    break
+                idx += 1
+
+            # Dọn các dòng trống dư ngay sau block đã xóa.
+            while idx < len(lines) and lines[idx].strip() == "":
+                idx += 1
+
+        cleaned = "\n".join(out).rstrip() + "\n"
+        return cleaned, removed
 
     @classmethod
     def _parse_source_note_metadata(cls, markdown: str) -> dict[str, str]:
@@ -511,6 +591,45 @@ class BoardService:
                     board.updated_at = now
             return changed
 
+    def cleanup_deprecated_source_note_metadata(
+        self,
+        *,
+        project_id: int | None = None,
+    ) -> int:
+        """Dọn các callout metadata deprecated trong toàn bộ source_note active.
+
+        Returns:
+            Số lượng source_note đã được chỉnh sửa file markdown.
+        """
+        from config.paths import NOTES_DIR
+        from core.services.note_service import NoteService
+        from core.services.project_service import ProjectService
+
+        note_svc = NoteService(NOTES_DIR)
+        notes = note_svc.list_all(note_type="source_note", include_deleted=False)
+
+        if project_id is not None:
+            allowed = ProjectService().get_project_note_ids(project_id)
+            notes = [n for n in notes if int(n.id) in allowed]
+
+        changed_notes = 0
+        for note in notes:
+            file_path = Path(str(note.file_path or ""))
+            if not file_path.exists():
+                continue
+
+            original = file_path.read_text(encoding="utf-8")
+            cleaned, removed_blocks = self._strip_deprecated_metadata_blocks(original)
+            if removed_blocks <= 0 or cleaned == original:
+                continue
+
+            file_path.write_text(cleaned, encoding="utf-8")
+            changed_notes += 1
+
+        if changed_notes > 0:
+            logger.info(f"Đã cleanup callout metadata deprecated cho {changed_notes} source_note")
+        return changed_notes
+
     def list_source_note_rows(self, board_id: int | None = None) -> list[BoardRow]:
         """Liệt kê hàng đã gắn source_note cho board hiện tại."""
         resolved_board_id = self._resolve_board_id(board_id)
@@ -628,7 +747,12 @@ class BoardService:
                 .filter(BoardColumn.board_id == resolved_board_id)
                 .count()
             )
-            col = BoardColumn(board_id=resolved_board_id, label=label, sort_order=max_order)
+            col = BoardColumn(
+                board_id=resolved_board_id,
+                label=label,
+                sort_order=max_order,
+                is_visible=True,
+            )
             session.add(col)
             board = session.get(Board, resolved_board_id)
             if board:
@@ -637,18 +761,90 @@ class BoardService:
             session.expunge(col)
         return col
 
-    def list_columns(self, board_id: int | None = None) -> list[BoardColumn]:
+    def list_columns(self, board_id: int | None = None, *, visible_only: bool = False) -> list[BoardColumn]:
         resolved_board_id = self._resolve_board_id(board_id)
         with get_session() as session:
-            cols = (
+            query = (
+                session.query(BoardColumn)
+                .filter(BoardColumn.board_id == resolved_board_id)
+            )
+            if visible_only:
+                query = query.filter(BoardColumn.is_visible.is_(True))
+
+            cols = query.order_by(BoardColumn.sort_order, BoardColumn.id).all()
+            for c in cols:
+                session.expunge(c)
+            return cols
+
+    def apply_column_configuration(
+        self,
+        board_id: int | None,
+        configurations: list[dict[str, object]],
+    ) -> None:
+        """Áp dụng cấu hình cột từ dialog Tùy chỉnh.
+
+        Mỗi cấu hình gồm: id (int|None), label (str), visible (bool).
+        - Cột hệ thống meta-analysis nếu bị loại khỏi danh sách sẽ được ẩn thay vì xóa.
+        - Cột tự tạo bị loại khỏi danh sách sẽ bị xóa.
+        """
+        resolved_board_id = self._resolve_board_id(board_id)
+        with get_session() as session:
+            existing = (
                 session.query(BoardColumn)
                 .filter(BoardColumn.board_id == resolved_board_id)
                 .order_by(BoardColumn.sort_order, BoardColumn.id)
                 .all()
             )
-            for c in cols:
-                session.expunge(c)
-            return cols
+            by_id = {int(c.id): c for c in existing}
+            kept_ids: set[int] = set()
+            used_labels: set[str] = set()
+
+            for idx, cfg in enumerate(configurations):
+                raw_label = str(cfg.get("label", "")).strip()
+                if not raw_label:
+                    raise PKMError("Tên tiêu chí không được để trống.")
+
+                lowered = raw_label.lower()
+                if lowered in used_labels:
+                    raise PKMError(f"Tiêu chí bị trùng: {raw_label}")
+                used_labels.add(lowered)
+
+                raw_id = cfg.get("id")
+                col_id = int(raw_id) if isinstance(raw_id, int) else None
+                visible = bool(cfg.get("visible", True))
+
+                if col_id is not None and col_id in by_id:
+                    col = by_id[col_id]
+                    col.label = raw_label
+                    col.sort_order = idx
+                    col.is_visible = visible
+                    kept_ids.add(col_id)
+                else:
+                    col = BoardColumn(
+                        board_id=resolved_board_id,
+                        label=raw_label,
+                        sort_order=idx,
+                        is_visible=visible,
+                    )
+                    session.add(col)
+                    session.flush()
+                    kept_ids.add(int(col.id))
+
+            tail_order = len(configurations)
+            for col in existing:
+                if int(col.id) in kept_ids:
+                    continue
+                if str(col.label) in META_ANALYSIS_COLUMNS:
+                    # Cột hệ thống: không xóa dữ liệu, chỉ ẩn.
+                    col.is_visible = False
+                    col.sort_order = tail_order
+                    tail_order += 1
+                else:
+                    session.delete(col)
+
+            board = session.get(Board, resolved_board_id)
+            if board:
+                board.updated_at = datetime.now(timezone.utc)
 
     def rename_column(self, col_id: int, label: str, board_id: int | None = None) -> None:
         label = label.strip()
@@ -756,7 +952,7 @@ class BoardService:
 
     def export_markdown(self, board_id: int | None = None) -> str:
         rows = self.list_rows(board_id=board_id)
-        cols = self.list_columns(board_id=board_id)
+        cols = self.list_columns(board_id=board_id, visible_only=True)
 
         if not rows or not cols:
             return "_Board chưa có dữ liệu._"
@@ -783,7 +979,7 @@ class BoardService:
 
     def export_csv(self, board_id: int | None = None) -> str:
         rows = self.list_rows(board_id=board_id)
-        cols = self.list_columns(board_id=board_id)
+        cols = self.list_columns(board_id=board_id, visible_only=True)
 
         buf = io.StringIO()
         writer = csv.writer(buf)

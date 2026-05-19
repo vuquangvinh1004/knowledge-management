@@ -66,6 +66,7 @@ class TestMigrationService:
             note_cols = {c["name"] for c in inspector.get_columns("notes")}
             assert "board_id" in row_cols
             assert "board_id" in col_cols
+            assert "is_visible" in col_cols
             assert "meta_json" in note_cols
         finally:
             _cleanup(engine)
