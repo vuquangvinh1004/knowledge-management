@@ -869,6 +869,67 @@ class TestBoardViewSmoke:
         assert True  # If we get here, no exception was raised
 
 
+class TestBoardCriteriaManagerDialogSmoke:
+    def test_locked_criterion_cannot_be_deleted(self, qtbot, monkeypatch):
+        from PySide6.QtWidgets import QMessageBox
+
+        from ui.widgets.dialogs.board_criteria_manager_dialog import BoardCriteriaManagerDialog
+
+        dialog = BoardCriteriaManagerDialog(
+            [
+                {
+                    "id": 1,
+                    "label": "Tác giả",
+                    "visible": True,
+                    "locked": True,
+                }
+            ]
+        )
+        qtbot.addWidget(dialog)
+        dialog._list_widget.setCurrentRow(0)
+
+        called = {"info": 0}
+
+        def _fake_information(*_args, **_kwargs):
+            called["info"] += 1
+            return QMessageBox.StandardButton.Ok
+
+        monkeypatch.setattr(QMessageBox, "information", _fake_information)
+
+        dialog._on_delete()
+
+        assert called["info"] == 1
+        assert dialog._list_widget.count() == 1
+
+    def test_custom_criterion_can_be_deleted_after_confirm(self, qtbot, monkeypatch):
+        from PySide6.QtWidgets import QMessageBox
+
+        from ui.widgets.dialogs.board_criteria_manager_dialog import BoardCriteriaManagerDialog
+
+        dialog = BoardCriteriaManagerDialog(
+            [
+                {
+                    "id": None,
+                    "label": "Tiêu chí tự tạo",
+                    "visible": True,
+                    "locked": False,
+                }
+            ]
+        )
+        qtbot.addWidget(dialog)
+        dialog._list_widget.setCurrentRow(0)
+
+        monkeypatch.setattr(
+            QMessageBox,
+            "question",
+            lambda *_args, **_kwargs: QMessageBox.StandardButton.Yes,
+        )
+
+        dialog._on_delete()
+
+        assert dialog._list_widget.count() == 0
+
+
 # ---------------------------------------------------------------------------
 # GraphViewWidget smoke test
 # ---------------------------------------------------------------------------

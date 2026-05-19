@@ -371,7 +371,7 @@ Deliverable: cải thiện tính ổn định thao tác xóa cứng và trải n
 | Loại bỏ triệt để tiêu chí không bắt buộc | Done | Cao | Xóa khỏi bộ tiêu chí hệ thống: `ID`, `Mã nghiên cứu`, `Hướng tác động`, `Effect size`, `Loại effect size`, `SE/SD`, `CI thấp`, `CI cao`, `p-value`, `Chất lượng nghiên cứu`, `Ghi chú mã hóa`, và 3 link-note |
 | Fix persist thứ tự tiêu chí sau restart | Done | Cao | Sửa `ensure_full_meta_columns()` để không ghi đè `sort_order` cột đã tồn tại; bảo toàn thứ tự người dùng đã lưu |
 | Đồng bộ quotes Metadata trong source_note template | Done | Cao | Template `## Metadata` chỉ còn quotes của tiêu chí hệ thống bắt buộc |
-| Test hồi quy UI + unit | Done | Cao | 421 tests pass; thêm test unit xác nhận reorder tiêu chí vẫn giữ sau `ensure_full_meta_columns()` |
+| Test hồi quy UI + unit | Done | Cao | 423 tests pass; thêm test unit giữ reorder sau `ensure_full_meta_columns()` và 2 UI smoke tests cho khóa/xóa tiêu chí trong dialog |
 
 Deliverable: bảng tổng hợp hiển thị đầy đủ nội dung, quote blocks có background nhất quán khi tràn dòng, người dùng quản lý tiêu chí linh hoạt hơn.
 
