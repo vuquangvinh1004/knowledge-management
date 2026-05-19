@@ -62,6 +62,18 @@ class TestReadWriteContent:
         assert "# Concept - SCCT" in content
         assert "## Định nghĩa" in content
 
+    def test_source_note_template_contains_metadata_callouts(self, service, db_session, sample_pdf_path):
+        from core.services.source_service import SourceService
+
+        src = SourceService().import_source(sample_pdf_path)
+        note = service.create_note(title="source - Template Metadata", note_type="source_note", source_id=src.id)
+        content = service.read_content(note.id)
+
+        assert "## Metadata" in content
+        assert "> [!TÁC GIẢ]" in content
+        assert "> [!NĂM]" in content
+        assert "Thông tin tiêu chí." not in content
+
 
 class TestNoteTitleWarnings:
     def test_title_warning_for_generic_title(self):

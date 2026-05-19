@@ -812,7 +812,7 @@ class TestBoardViewSmoke:
         view.refresh()
         assert view._empty_state.isHidden()
         assert not view._table.isHidden()
-        assert len(view._cols) == 34
+        assert len(view._cols) == 30
         assert all(getattr(r, "source_note_id", None) is not None for r in view._rows)
         assert view._table.rowCount() == len(view._cols)
         assert view._table.columnCount() == len(view._rows)
@@ -828,7 +828,7 @@ class TestBoardViewSmoke:
         qtbot.addWidget(view)
         view.refresh()
         assert view._active_board_id == default_board.id
-        assert len(view._cols) == 34
+        assert len(view._cols) == 30
 
 
 # ---------------------------------------------------------------------------

@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import re
 
+from core.utils.constants import BOARD_META_ANALYSIS_CRITERIA
+
 
 _GENERIC_TITLE_PATTERNS = (
     re.compile(r"^note(\s+moi|\s*\d+)?$", re.IGNORECASE),
@@ -20,6 +22,10 @@ def build_note_template(note_type: str, title: str) -> str:
     safe_title = title.strip() or "(Chưa đặt tiêu đề)"
 
     if note_type == "source_note":
+        metadata_blocks = "\n\n".join(
+            f"> [!{criterion.upper()}]\n>"
+            for criterion in BOARD_META_ANALYSIS_CRITERIA
+        )
         return (
             f"# {safe_title}\n\n"
             "## Thông tin nguồn\n"
@@ -39,7 +45,9 @@ def build_note_template(note_type: str, title: str) -> str:
             "## Trích dẫn / dữ kiện quan trọng\n"
             "- \n\n"
             "## Ghi chú của tôi\n"
-            "- \n"
+            "- \n\n"
+            "## Metadata\n"
+            f"{metadata_blocks}\n"
         )
 
     if note_type == "concept_note":

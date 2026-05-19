@@ -8,55 +8,21 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 from core.storage.models import Board, BoardCell, BoardColumn, BoardRow, Note
 from core.storage.session import get_session
+from core.utils.constants import BOARD_META_ANALYSIS_CRITERIA
 from core.utils.exceptions import PKMError
 from core.utils.logger import get_logger
 
 logger = get_logger()
 
-META_ANALYSIS_COLUMNS = [
-    "ID",
-    "Mã nghiên cứu",
-    "Tác giả",
-    "Năm",
-    "Tiêu đề",
-    "Quốc gia/Bối cảnh",
-    "Loại nguồn",
-    "Mục tiêu nghiên cứu",
-    "Câu hỏi nghiên cứu",
-    "Lý thuyết/khung phân tích",
-    "Chủ đề chính",
-    "Biến độc lập",
-    "Biến phụ thuộc",
-    "Biến trung gian/điều tiết",
-    "Đối tượng nghiên cứu",
-    "Cỡ mẫu",
-    "Phương pháp nghiên cứu",
-    "Công cụ phân tích",
-    "Thiết kế nghiên cứu",
-    "Thang đo/chỉ báo",
-    "Kết quả chính",
-    "Hướng tác động",
-    "Effect size",
-    "Loại effect size",
-    "SE/SD",
-    "CI thấp",
-    "CI cao",
-    "p-value",
-    "Chất lượng nghiên cứu",
-    "Hạn chế",
-    "Ghi chú mã hóa",
-    "Link source_note",
-    "Link concept_note",
-    "Link synthesis_note",
-]
+META_ANALYSIS_COLUMNS = list(BOARD_META_ANALYSIS_CRITERIA)
 
 LITERATURE_COLUMNS = [
-    "ID",
     "Mã nghiên cứu",
     "Tác giả",
     "Năm",
@@ -73,10 +39,11 @@ LITERATURE_COLUMNS = [
     "Kết quả chính",
     "Hạn chế",
     "Ghi chú mã hóa",
-    "Link source_note",
-    "Link concept_note",
-    "Link synthesis_note",
 ]
+
+_META_SECTION_RE = re.compile(r"^##\s+Metadata\s*$", re.IGNORECASE)
+_MY_NOTES_SECTION_RE = re.compile(r"^##\s+Ghi\s+chú\s+của\s+tôi\s*$", re.IGNORECASE)
+_META_CALLOUT_RE = re.compile(r"^>\s*\[!\s*(.*?)\s*\]\s*$")
 
 
 class BoardService:
@@ -240,9 +207,9 @@ class BoardService:
         return self.get_default_board().id
 
     def ensure_full_meta_columns(self, board_id: int | None = None) -> list[BoardColumn]:
-        """Đảm bảo board có đủ bộ cột meta-analysis 34 cột theo thứ tự chuẩn.
+        """Đảm bảo board có đủ bộ cột meta-analysis 30 cột theo thứ tự chuẩn.
 
-        Ghi chú: không xóa cột legacy để tránh mất dữ liệu cũ; UI sẽ chỉ dùng bộ 34 cột chuẩn.
+        Ghi chú: không xóa cột legacy để tránh mất dữ liệu cũ; UI sẽ chỉ dùng bộ 30 cột chuẩn.
         """
         resolved_board_id = self._resolve_board_id(board_id)
         with get_session() as session:
@@ -349,6 +316,200 @@ class BoardService:
             for r in linked_rows:
                 session.expunge(r)
             return linked_rows
+
+    @staticmethod
+    def _normalize_meta_key(text: str) -> str:
+        return " ".join(str(text or "").strip().upper().split())
+
+    @classmethod
+    def _parse_source_note_metadata(cls, markdown: str) -> dict[str, str]:
+        """Parse section '## Metadata' theo cấu trúc quote callout.
+
+        Định dạng hỗ trợ:
+        > [!TÊN TIÊU CHÍ]
+        > Giá trị dòng 1
+        > Giá trị dòng 2
+        """
+        lines = markdown.splitlines()
+
+        def _parse_from(start_idx: int) -> dict[str, str]:
+            parsed: dict[str, str] = {}
+            idx = start_idx
+            while idx < len(lines):
+                line = lines[idx]
+                if line.startswith("## "):
+                    break
+
+                callout = _META_CALLOUT_RE.match(line)
+                if not callout:
+                    idx += 1
+                    continue
+
+                raw_key = cls._normalize_meta_key(callout.group(1))
+                idx += 1
+
+                value_lines: list[str] = []
+                while idx < len(lines):
+                    current = lines[idx]
+                    if current.startswith("## "):
+                        break
+                    if _META_CALLOUT_RE.match(current):
+                        break
+
+                    stripped = current.strip()
+                    if current.lstrip().startswith(">"):
+                        payload = current.lstrip()[1:]
+                        if payload.startswith(" "):
+                            payload = payload[1:]
+                        value_lines.append(payload.rstrip())
+                        idx += 1
+                        continue
+
+                    # Backward-compatible: chấp nhận dòng thường nếu người dùng không giữ prefix '>'
+                    if stripped:
+                        value_lines.append(current.rstrip())
+                        idx += 1
+                        continue
+
+                    value_lines.append("")
+                    idx += 1
+
+                value = "\n".join(value_lines).strip()
+                normalized_placeholder = cls._normalize_meta_key(value).rstrip(".")
+                if normalized_placeholder in {"THÔNG TIN TIÊU CHÍ", "THONG TIN TIEU CHI"}:
+                    value = ""
+
+                if raw_key:
+                    parsed[raw_key] = value
+            return parsed
+
+        metadata_start: int | None = None
+        notes_start: int | None = None
+        for i, line in enumerate(lines):
+            normalized = line.strip()
+            if metadata_start is None and _META_SECTION_RE.match(normalized):
+                metadata_start = i + 1
+            if notes_start is None and _MY_NOTES_SECTION_RE.match(normalized):
+                notes_start = i + 1
+
+        if metadata_start is not None:
+            return _parse_from(metadata_start)
+        if notes_start is not None:
+            return _parse_from(notes_start)
+        return {}
+
+    def sync_cells_from_source_note_metadata(
+        self,
+        board_id: int | None = None,
+        *,
+        project_id: int | None = None,
+    ) -> int:
+        """Đồng bộ metadata từ source_note vào cell của Research Board.
+
+        Chỉ cập nhật các source_note còn active. Dữ liệu cũ của row legacy vẫn được giữ.
+        """
+        resolved_board_id = self._resolve_board_id(board_id)
+        now = datetime.now(timezone.utc)
+
+        with get_session() as session:
+            rows = (
+                session.query(BoardRow)
+                .filter(
+                    BoardRow.board_id == resolved_board_id,
+                    BoardRow.source_note_id.is_not(None),
+                )
+                .all()
+            )
+            if not rows:
+                return 0
+
+            note_ids = [int(r.source_note_id) for r in rows if r.source_note_id is not None]
+            notes = (
+                session.query(Note)
+                .filter(
+                    Note.id.in_(note_ids),
+                    Note.note_type == "source_note",
+                    Note.is_deleted == 0,
+                )
+                .all()
+            )
+
+            note_by_id = {int(n.id): n for n in notes if n.id is not None}
+            if not note_by_id:
+                return 0
+
+            columns = (
+                session.query(BoardColumn)
+                .filter(
+                    BoardColumn.board_id == resolved_board_id,
+                    BoardColumn.label.in_(META_ANALYSIS_COLUMNS),
+                )
+                .all()
+            )
+            col_by_key = {
+                self._normalize_meta_key(str(c.label)): c
+                for c in columns
+            }
+            if not col_by_key:
+                return 0
+
+            row_ids = [int(r.id) for r in rows if r.id is not None]
+            col_ids = [int(c.id) for c in columns if c.id is not None]
+            existing_cells = (
+                session.query(BoardCell)
+                .filter(
+                    BoardCell.row_id.in_(row_ids),
+                    BoardCell.col_id.in_(col_ids),
+                )
+                .all()
+            )
+            existing_map = {(int(c.row_id), int(c.col_id)): c for c in existing_cells}
+
+            changed = 0
+            for row in rows:
+                row_id = int(row.id)
+                source_note_id = int(row.source_note_id or 0)
+                note = note_by_id.get(source_note_id)
+                if note is None:
+                    continue
+
+                file_path = Path(str(note.file_path or ""))
+                if not file_path.exists():
+                    continue
+
+                metadata = self._parse_source_note_metadata(file_path.read_text(encoding="utf-8"))
+                if not metadata:
+                    continue
+
+                for key, value in metadata.items():
+                    col = col_by_key.get(key)
+                    if col is None:
+                        continue
+
+                    map_key = (row_id, int(col.id))
+                    current = existing_map.get(map_key)
+                    if current is None:
+                        session.add(
+                            BoardCell(
+                                row_id=row_id,
+                                col_id=int(col.id),
+                                content_md=value,
+                                updated_at=now,
+                            )
+                        )
+                        changed += 1
+                        continue
+
+                    if (current.content_md or "") != value:
+                        current.content_md = value
+                        current.updated_at = now
+                        changed += 1
+
+            if changed > 0:
+                board = session.get(Board, resolved_board_id)
+                if board is not None:
+                    board.updated_at = now
+            return changed
 
     def list_source_note_rows(self, board_id: int | None = None) -> list[BoardRow]:
         """Liệt kê hàng đã gắn source_note cho board hiện tại."""

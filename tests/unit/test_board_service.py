@@ -163,7 +163,7 @@ class TestBoards:
 
 
 class TestBoardTemplates:
-    def test_create_from_template_meta_analysis_has_34_columns(self, board_service, notes_dir):
+    def test_create_from_template_meta_analysis_has_30_columns(self, board_service, notes_dir):
         board, note_id = board_service.create_from_template(
             "meta_analysis",
             "Meta Full",
@@ -173,9 +173,9 @@ class TestBoardTemplates:
         assert board is not None
         assert note_id is None
         cols = board_service.list_columns(board_id=board.id)
-        assert len(cols) == 34
+        assert len(cols) == 30
 
-    def test_create_from_template_literature_has_20_columns(self, board_service, notes_dir):
+    def test_create_from_template_literature_has_16_columns(self, board_service, notes_dir):
         board, note_id = board_service.create_from_template(
             "literature",
             "Lit Board",
@@ -185,7 +185,7 @@ class TestBoardTemplates:
         assert board is not None
         assert note_id is None
         cols = board_service.list_columns(board_id=board.id)
-        assert len(cols) == 20
+        assert len(cols) == 16
 
     def test_create_from_template_with_linked_board_note(self, board_service, notes_dir):
         board, note_id = board_service.create_from_template(
@@ -210,9 +210,9 @@ class TestBoardTemplates:
 
 
 class TestBoardSourceNoteSync:
-    def test_ensure_full_meta_columns_returns_34(self, board_service):
+    def test_ensure_full_meta_columns_returns_30(self, board_service):
         cols = board_service.ensure_full_meta_columns()
-        assert len(cols) == 34
+        assert len(cols) == 30
 
     def test_sync_rows_with_source_notes_creates_linked_rows(self, board_service, notes_dir):
         from datetime import datetime, timezone
@@ -272,6 +272,162 @@ class TestBoardSourceNoteSync:
         rows = board_service.list_source_note_rows()
         assert all(r.source_note_id is not None for r in rows)
         assert any(int(r.source_note_id or 0) == int(note.id) for r in rows)
+
+    def test_sync_cells_from_source_note_metadata_updates_board_cells(self, board_service, notes_dir):
+        from datetime import datetime, timezone
+
+        from core.services.note_service import NoteService
+        from core.storage.models import Source
+        from core.storage.session import get_session
+
+        with get_session() as session:
+            src = Source(
+                file_path="D:/meta-sync-source.pdf",
+                file_hash="meta_sync_source_hash",
+                title="Meta Sync Source",
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
+            )
+            session.add(src)
+            session.flush()
+            source_id = int(src.id)
+
+        content = (
+            "# source - Meta Sync\n\n"
+            "## Ghi chú của tôi\n"
+            "- \n\n"
+            "## Metadata\n"
+            "> [!TÁC GIẢ]\n"
+            "> Lê Thị Lan Phương, Phạm Huy Kiến Tài.\n\n"
+            "> [!NĂM]\n"
+            "> 2024\n"
+        )
+
+        note = NoteService(notes_dir).create_note(
+            title="source - Meta Sync",
+            note_type="source_note",
+            source_id=source_id,
+            initial_content=content,
+        )
+
+        board_service.ensure_full_meta_columns()
+        rows = board_service.sync_rows_with_source_notes()
+        assert any(int(r.source_note_id or 0) == int(note.id) for r in rows)
+
+        changed = board_service.sync_cells_from_source_note_metadata()
+        assert changed >= 2
+
+        row = next(r for r in rows if int(r.source_note_id or 0) == int(note.id))
+        cols = {c.label: c for c in board_service.ensure_full_meta_columns()}
+
+        author_cell = board_service.get_cell(row.id, cols["Tác giả"].id)
+        year_cell = board_service.get_cell(row.id, cols["Năm"].id)
+        assert author_cell is not None
+        assert year_cell is not None
+        assert author_cell.content_md == "Lê Thị Lan Phương, Phạm Huy Kiến Tài."
+        assert year_cell.content_md == "2024"
+
+    def test_sync_rows_keeps_existing_cells_when_source_note_soft_deleted(self, board_service, notes_dir):
+        from datetime import datetime, timezone
+
+        from core.services.note_service import NoteService
+        from core.storage.models import Source
+        from core.storage.session import get_session
+
+        note_svc = NoteService(notes_dir)
+
+        with get_session() as session:
+            src = Source(
+                file_path="D:/meta-persist-source.pdf",
+                file_hash="meta_persist_source_hash",
+                title="Meta Persist Source",
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
+            )
+            session.add(src)
+            session.flush()
+            source_id = int(src.id)
+
+        note = note_svc.create_note(
+            title="source - Persist",
+            note_type="source_note",
+            source_id=source_id,
+            initial_content=(
+                "# source - Persist\n\n"
+                "## Metadata\n"
+                "> [!NĂM]\n"
+                "> 2025\n"
+            ),
+        )
+
+        board_service.ensure_full_meta_columns()
+        rows = board_service.sync_rows_with_source_notes()
+        row = next(r for r in rows if int(r.source_note_id or 0) == int(note.id))
+        board_service.sync_cells_from_source_note_metadata()
+
+        year_col = next(c for c in board_service.ensure_full_meta_columns() if c.label == "Năm")
+        cell_before = board_service.get_cell(row.id, year_col.id)
+        assert cell_before is not None
+        assert cell_before.content_md == "2025"
+
+        note_svc.soft_delete(note.id)
+        board_service.sync_rows_with_source_notes()
+        board_service.sync_cells_from_source_note_metadata()
+
+        cell_after = board_service.get_cell(row.id, year_col.id)
+        assert cell_after is not None
+        assert cell_after.content_md == "2025"
+
+    def test_sync_cells_from_my_notes_section_without_metadata_header(self, board_service, notes_dir):
+        from datetime import datetime, timezone
+
+        from core.services.note_service import NoteService
+        from core.storage.models import Source
+        from core.storage.session import get_session
+
+        with get_session() as session:
+            src = Source(
+                file_path="D:/legacy-notes-section-source.pdf",
+                file_hash="legacy_notes_section_hash",
+                title="Legacy Notes Section",
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
+            )
+            session.add(src)
+            session.flush()
+            source_id = int(src.id)
+
+        note = NoteService(notes_dir).create_note(
+            title="source - Legacy Metadata",
+            note_type="source_note",
+            source_id=source_id,
+            initial_content=(
+                "# source - Legacy Metadata\n\n"
+                "## Ghi chú của tôi\n"
+                "> [!TÁC GIẢ]\n"
+                "> Legacy Author\n\n"
+                "> [!NĂM]\n"
+                "> 2021\n\n"
+                "> [!QUỐC GIA/BỐI CẢNH]\n"
+                "> Thông tin tiêu chí.\n"
+            ),
+        )
+
+        board_service.ensure_full_meta_columns()
+        rows = board_service.sync_rows_with_source_notes()
+        assert any(int(r.source_note_id or 0) == int(note.id) for r in rows)
+
+        board_service.sync_cells_from_source_note_metadata()
+        row = next(r for r in rows if int(r.source_note_id or 0) == int(note.id))
+        cols = {c.label: c for c in board_service.ensure_full_meta_columns()}
+
+        author_cell = board_service.get_cell(row.id, cols["Tác giả"].id)
+        year_cell = board_service.get_cell(row.id, cols["Năm"].id)
+        context_cell = board_service.get_cell(row.id, cols["Quốc gia/Bối cảnh"].id)
+
+        assert author_cell is not None and author_cell.content_md == "Legacy Author"
+        assert year_cell is not None and year_cell.content_md == "2021"
+        assert context_cell is not None and context_cell.content_md == ""
 
 
 class TestBoardExport:

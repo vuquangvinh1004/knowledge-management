@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
+    QLabel,
     QMenu,
     QMessageBox,
     QPlainTextEdit,
@@ -24,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.widgets.empty_state import EmptyStateWidget
+from ui.widgets.dialogs.board_criteria_manager_dialog import BoardCriteriaManagerDialog
 from core.utils.logger import get_logger
 
 logger = get_logger()
@@ -96,6 +98,11 @@ class BoardView(QWidget):
         toolbar.addWidget(self._btn_export_csv)
 
         toolbar.addSeparator()
+
+        self._btn_customize = QPushButton("Tùy chỉnh")
+        self._btn_customize.setToolTip("Quản lý tiêu chí: thêm, xóa, sửa, sắp xếp")
+        self._btn_customize.clicked.connect(self._open_criteria_manager)
+        toolbar.addWidget(self._btn_customize)
         self._btn_graph_view = QPushButton("Đồ thị liên kết")
         self._btn_graph_view.setToolTip("Mở đồ thị liên kết ghi chú")
         self._btn_graph_view.clicked.connect(self._open_graph_view)
@@ -183,18 +190,22 @@ class BoardView(QWidget):
         for ri, col in enumerate(self._cols):
             for ci, row in enumerate(self._rows):
                 content = cells_map.get((row.id, col.id), "")
-                item = QTableWidgetItem(content[:80] + ("…" if len(content) > 80 else ""))
+                item = QTableWidgetItem(content)
                 item.setToolTip(content)
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEnabled)
                 self._table.setItem(ri, ci, item)
 
         h_header = self._table.horizontalHeader()
         h_header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        h_header.setDefaultSectionSize(220)
+        h_header.setDefaultSectionSize(280)
 
         v_header = self._table.verticalHeader()
         v_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        v_header.setMinimumSectionSize(24)
+        v_header.setMinimumSectionSize(60)
         self._table.verticalHeader().setFixedWidth(250)
+        
+        self._table.resizeRowsToContents()
+        self._table.setWordWrap(True)
 
     def _update_visibility(self) -> None:
         has_data = bool(self._rows)
@@ -213,7 +224,12 @@ class BoardView(QWidget):
     # ------------------------------------------------------------------
 
     def _sync_source_rows(self) -> None:
-        self._get_service().sync_rows_with_source_notes(
+        svc = self._get_service()
+        svc.sync_rows_with_source_notes(
+            board_id=self._active_board_id,
+            project_id=self._project_id,
+        )
+        svc.sync_cells_from_source_note_metadata(
             board_id=self._active_board_id,
             project_id=self._project_id,
         )
@@ -326,4 +342,60 @@ class BoardView(QWidget):
         layout.addLayout(action_row)
 
         dlg.exec()
+
+    # ------------------------------------------------------------------
+    # Customize criteria
+    # ------------------------------------------------------------------
+
+    def _open_criteria_manager(self) -> None:
+        """Mở dialog quản lý tiêu chí bảng."""
+        svc = self._get_service()
+        if self._active_board_id is None:
+            QMessageBox.warning(self, "Lỗi", "Chưa có board nào được chọn!")
+            return
+
+        board = svc.get_board(self._active_board_id)
+        if board is None:
+            QMessageBox.warning(self, "Lỗi", "Không tìm thấy board!")
+            return
+
+        # Lấy danh sách tiêu chí hiện tại từ board columns
+        current_criteria = [col.name for col in svc.list_columns(self._active_board_id)]
+
+        dlg = BoardCriteriaManagerDialog(current_criteria, self)
+        if dlg.exec():
+            new_criteria = dlg.get_criteria()
+
+            # Xác định các tiêu chí bị thêm, sửa, xóa
+            # Lưu ý: Điều này là đơn giản - chỉ support add/delete column, không support rename
+            # Nếu tương lai cần rename, sẽ cần track mapping cũ->mới
+
+            deleted_criteria = set(current_criteria) - set(new_criteria)
+            added_criteria = set(new_criteria) - set(current_criteria)
+            reordered = new_criteria  # Danh sách mới đã được sắp xếp
+
+            try:
+                # Xóa các tiêu chí bị xóa (xóa column và cascade ô)
+                for criterion in deleted_criteria:
+                    col = next(
+                        (c for c in svc.list_columns(self._active_board_id) if c.name == criterion),
+                        None,
+                    )
+                    if col:
+                        svc.delete_column(col.id, self._active_board_id)
+
+                # Thêm tiêu chí mới
+                for criterion in added_criteria:
+                    svc.create_column(criterion, self._active_board_id)
+
+                # Cập nhật thứ tự tiêu chí (nếu cần)
+                # Lưu ý: Hiện tại, order được lưu implicit qua position trong list_columns
+                # Nếu muốn explicit order, cần thêm column `position` vào model
+
+                QMessageBox.information(self, "Thành công", "Tiêu chí đã được cập nhật.")
+                self.refresh()
+            except Exception as exc:
+                QMessageBox.warning(self, "Lỗi", f"Không thể cập nhật tiêu chí: {exc}")
+                logger.exception("Error updating board criteria")
+
 

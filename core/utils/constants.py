@@ -42,3 +42,44 @@ AUTOSAVE_INTERVAL_SECONDS = 30
 
 # Lock
 LOCK_TIMEOUT_SECONDS = 5
+
+# Board metadata criteria (dùng cho Research Board và template source_note)
+BOARD_META_ANALYSIS_OMITTED_CRITERIA = (
+	"ID",
+	"Link source_note",
+	"Link concept_note",
+	"Link synthesis_note",
+)
+
+BOARD_META_ANALYSIS_CRITERIA = (
+	"Mã nghiên cứu",
+	"Tác giả",
+	"Năm",
+	"Tiêu đề",
+	"Quốc gia/Bối cảnh",
+	"Loại nguồn",
+	"Mục tiêu nghiên cứu",
+	"Câu hỏi nghiên cứu",
+	"Lý thuyết/khung phân tích",
+	"Chủ đề chính",
+	"Biến độc lập",
+	"Biến phụ thuộc",
+	"Biến trung gian/điều tiết",
+	"Đối tượng nghiên cứu",
+	"Cỡ mẫu",
+	"Phương pháp nghiên cứu",
+	"Công cụ phân tích",
+	"Thiết kế nghiên cứu",
+	"Thang đo/chỉ báo",
+	"Kết quả chính",
+	"Hướng tác động",
+	"Effect size",
+	"Loại effect size",
+	"SE/SD",
+	"CI thấp",
+	"CI cao",
+	"p-value",
+	"Chất lượng nghiên cứu",
+	"Hạn chế",
+	"Ghi chú mã hóa",
+)
