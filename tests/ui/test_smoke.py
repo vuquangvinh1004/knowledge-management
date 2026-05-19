@@ -830,6 +830,22 @@ class TestBoardViewSmoke:
         assert view._active_board_id == default_board.id
         assert len(view._cols) == 30
 
+    def test_customize_button_exists_and_clickable(self, qtbot, db_session):
+        from ui.views.board_view import BoardView
+
+        view = BoardView()
+        qtbot.addWidget(view)
+        view.refresh()
+        
+        assert hasattr(view, "_btn_customize")
+        assert view._btn_customize is not None
+        assert view._btn_customize.text() == "Tùy chỉnh"
+        
+        # Button should be clickable without raising exception
+        # (dialog opens modally, so we just verify the click doesn't crash)
+        view._btn_customize.click()
+        assert True  # If we get here, no exception was raised
+
 
 # ---------------------------------------------------------------------------
 # GraphViewWidget smoke test

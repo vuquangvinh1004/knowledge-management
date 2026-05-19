@@ -92,3 +92,15 @@ $$
     a^2 + b^2 = c^2
 \end{equation}
 $$
+
+
+> [!TÊN TIÊU CHÍ]
+> Thông tin tiêu chí.
+
+Ví dụ minh họa:
+
+> [!TÁC GIẢ]
+> Lê Thị Lan Phương, Phạm Huy Kiến Tài.
+
+> [!NĂM]
+> 2024

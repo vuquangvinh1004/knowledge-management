@@ -95,6 +95,41 @@ QPushButton:disabled {
     border-color: #E0E0E0;
 }
 
+/* === Special buttons === */
+QPushButton#btnCustomize {
+    background-color: #DCFCE7;
+    color: #166534;
+    border: 1px solid #86EFAC;
+    font-weight: 600;
+}
+
+QPushButton#btnCustomize:hover {
+    background-color: #C6F6D5;
+    border-color: #34D399;
+}
+
+QPushButton#btnCustomize:pressed {
+    background-color: #10B981;
+    color: white;
+}
+
+QPushButton#btnGraphView {
+    background-color: #DBEAFE;
+    color: #1E40AF;
+    border: 1px solid #93C5FD;
+    font-weight: 600;
+}
+
+QPushButton#btnGraphView:hover {
+    background-color: #BFDBFE;
+    border-color: #60A5FA;
+}
+
+QPushButton#btnGraphView:pressed {
+    background-color: #3B82F6;
+    color: white;
+}
+
 /* === Group boxes === */
 QGroupBox {
     font-size: 13px;

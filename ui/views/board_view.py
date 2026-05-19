@@ -100,10 +100,13 @@ class BoardView(QWidget):
         toolbar.addSeparator()
 
         self._btn_customize = QPushButton("Tùy chỉnh")
+        self._btn_customize.setObjectName("btnCustomize")
         self._btn_customize.setToolTip("Quản lý tiêu chí: thêm, xóa, sửa, sắp xếp")
         self._btn_customize.clicked.connect(self._open_criteria_manager)
         toolbar.addWidget(self._btn_customize)
+
         self._btn_graph_view = QPushButton("Đồ thị liên kết")
+        self._btn_graph_view.setObjectName("btnGraphView")
         self._btn_graph_view.setToolTip("Mở đồ thị liên kết ghi chú")
         self._btn_graph_view.clicked.connect(self._open_graph_view)
         toolbar.addWidget(self._btn_graph_view)
@@ -349,22 +352,31 @@ class BoardView(QWidget):
 
     def _open_criteria_manager(self) -> None:
         """Mở dialog quản lý tiêu chí bảng."""
+        logger.debug(f"_open_criteria_manager called, _active_board_id={self._active_board_id}")
+        
         svc = self._get_service()
         if self._active_board_id is None:
+            logger.warning("No active board ID set")
             QMessageBox.warning(self, "Lỗi", "Chưa có board nào được chọn!")
             return
 
         board = svc.get_board(self._active_board_id)
         if board is None:
+            logger.warning(f"Board {self._active_board_id} not found")
             QMessageBox.warning(self, "Lỗi", "Không tìm thấy board!")
             return
 
+        logger.debug(f"Loading criteria for board {self._active_board_id}")
         # Lấy danh sách tiêu chí hiện tại từ board columns
-        current_criteria = [col.name for col in svc.list_columns(self._active_board_id)]
+        current_criteria = [col.label for col in svc.list_columns(self._active_board_id)]
+        logger.debug(f"Current criteria: {current_criteria}")
 
         dlg = BoardCriteriaManagerDialog(current_criteria, self)
+        logger.debug("Dialog created, executing...")
+        
         if dlg.exec():
             new_criteria = dlg.get_criteria()
+            logger.debug(f"Dialog accepted with new criteria: {new_criteria}")
 
             # Xác định các tiêu chí bị thêm, sửa, xóa
             # Lưu ý: Điều này là đơn giản - chỉ support add/delete column, không support rename
@@ -374,18 +386,22 @@ class BoardView(QWidget):
             added_criteria = set(new_criteria) - set(current_criteria)
             reordered = new_criteria  # Danh sách mới đã được sắp xếp
 
+            logger.debug(f"Deleted: {deleted_criteria}, Added: {added_criteria}")
+
             try:
                 # Xóa các tiêu chí bị xóa (xóa column và cascade ô)
                 for criterion in deleted_criteria:
                     col = next(
-                        (c for c in svc.list_columns(self._active_board_id) if c.name == criterion),
+                        (c for c in svc.list_columns(self._active_board_id) if c.label == criterion),
                         None,
                     )
                     if col:
+                        logger.debug(f"Deleting column {criterion} (id={col.id})")
                         svc.delete_column(col.id, self._active_board_id)
 
                 # Thêm tiêu chí mới
                 for criterion in added_criteria:
+                    logger.debug(f"Creating column {criterion}")
                     svc.create_column(criterion, self._active_board_id)
 
                 # Cập nhật thứ tự tiêu chí (nếu cần)
@@ -395,7 +411,9 @@ class BoardView(QWidget):
                 QMessageBox.information(self, "Thành công", "Tiêu chí đã được cập nhật.")
                 self.refresh()
             except Exception as exc:
-                QMessageBox.warning(self, "Lỗi", f"Không thể cập nhật tiêu chí: {exc}")
                 logger.exception("Error updating board criteria")
+                QMessageBox.warning(self, "Lỗi", f"Không thể cập nhật tiêu chí: {exc}")
+        else:
+            logger.debug("Dialog rejected/closed")
 
 
