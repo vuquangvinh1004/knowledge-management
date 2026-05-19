@@ -356,6 +356,18 @@ Deliverable: tab Bảng nghiên cứu chuyển sang vai trò ma trận phân tí
 
 Deliverable: cải thiện tính ổn định thao tác xóa cứng và trải nghiệm nhận diện trạng thái note/board rõ ràng hơn.
 
+#### 2026-05-20 — Display Refinements & Criteria Management (Board UX improvements)
+
+| Hạng mục | Trạng thái | Ưu tiên | Ghi chú |
+| --- | --- | --- | --- |
+| Mở rộng hiển thị ô bảng (word wrap) | Done | Cao | Tăng width mặc định từ 220→280px, bỏ truncate 80 ký, enable resizeRowsToContents |
+| Fix quote/blockquote background khi tràn dòng | Done | Cao | Thêm background color (#EFF4F9) cho blockquote line format trong markdown editor |
+| Thêm button "Tùy chỉnh" tiêu chí bảng | Done | Cao | New dialog `BoardCriteriaManagerDialog` với CRUD + drag-reorder; tích hợp toolbar BoardView |
+| Xác thực CRUD tiêu chí + cascade delete | Done | Cao | create_column + delete_column với cascade xóa ô; list_columns giữ thứ tự |
+| Test hồi quy UI + unit | Done | Cao | 307 unit tests pass; 4 board smoke tests pass |
+
+Deliverable: bảng tổng hợp hiển thị đầy đủ nội dung, quote blocks có background nhất quán khi tràn dòng, người dùng quản lý tiêu chí linh hoạt hơn.
+
 ---
 
 ## 3. Sprint ưu tiên đề xuất
