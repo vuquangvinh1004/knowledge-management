@@ -138,9 +138,9 @@ class DualPaneHost(QWidget):
         """Làm mới popup dữ liệu [[wikilink]] ở editor."""
         self._md_editor.refresh_wikilink_catalog()
 
-    def apply_editor_preferences(self, font_family: str, font_ligatures: bool) -> None:
+    def apply_editor_preferences(self, font_family: str, font_ligatures: bool, font_size: int) -> None:
         """Áp dụng cài đặt font editor cho markdown editor hiện tại."""
-        self._md_editor.apply_editor_preferences(font_family, font_ligatures)
+        self._md_editor.apply_editor_preferences(font_family, font_ligatures, font_size)
 
     # ------------------------------------------------------------------
     # Tab management

@@ -248,9 +248,9 @@ class MainWindow(QMainWindow):
         """Khi catalog note thay đổi từ Settings: refresh các view liên quan."""
         mwh.on_note_catalog_changed(self, logger)
 
-    def _on_editor_preferences_changed(self, font_family: str, font_ligatures: bool) -> None:
+    def _on_editor_preferences_changed(self, font_family: str, font_ligatures: bool, font_size: int) -> None:
         """Áp dụng ngay cài đặt font editor cho workspace hiện tại."""
-        mwh.on_editor_preferences_changed(self, font_family, font_ligatures, logger)
+        mwh.on_editor_preferences_changed(self, font_family, font_ligatures, font_size, logger)
 
     # ------------------------------------------------------------------
     # Geometry persistence

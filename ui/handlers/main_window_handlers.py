@@ -231,15 +231,22 @@ def on_note_catalog_changed(window: Any, logger: Any) -> None:
         logger.warning("Refresh note management view thất bại: {}", exc)
 
 
-def on_editor_preferences_changed(window: Any, font_family: str, font_ligatures: bool, logger: Any) -> None:
+def on_editor_preferences_changed(
+    window: Any,
+    font_family: str,
+    font_ligatures: bool,
+    font_size: int,
+    logger: Any,
+) -> None:
     """Áp dụng ngay cài đặt editor cho workspace hiện tại."""
     try:
-        window._workspace_view.apply_editor_preferences(font_family, font_ligatures)
+        window._workspace_view.apply_editor_preferences(font_family, font_ligatures, font_size)
     except Exception as exc:  # noqa: BLE001
         logger.warning(
-            "Áp dụng editor preferences thất bại (font_family={}, font_ligatures={}): {}",
+            "Áp dụng editor preferences thất bại (font_family={}, font_ligatures={}, font_size={}): {}",
             font_family,
             font_ligatures,
+            font_size,
             exc,
         )
 

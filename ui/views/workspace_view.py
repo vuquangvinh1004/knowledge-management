@@ -84,9 +84,9 @@ class WorkspaceView(QWidget):
         """Làm mới danh sách note dùng cho wikilink ở editor đang mở."""
         self._dual_pane.refresh_wikilink_catalog()
 
-    def apply_editor_preferences(self, font_family: str, font_ligatures: bool) -> None:
+    def apply_editor_preferences(self, font_family: str, font_ligatures: bool, font_size: int) -> None:
         """Áp dụng cấu hình font editor vào dual pane hiện tại."""
-        self._dual_pane.apply_editor_preferences(font_family, font_ligatures)
+        self._dual_pane.apply_editor_preferences(font_family, font_ligatures, font_size)
 
     def set_project_context(self, project_id: int | None) -> None:
         """Bật/tắt Project mode cho Workspace view."""

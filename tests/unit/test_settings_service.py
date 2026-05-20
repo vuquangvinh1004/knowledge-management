@@ -37,6 +37,7 @@ class TestSettingsService:
         assert "fts_rebuild_on_startup" in defaults
         assert "editor.fontFamily" in defaults
         assert "editor.fontLigatures" in defaults
+        assert "editor.fontSize" in defaults
 
     def test_reset_to_defaults_restores_theme(self):
         from core.services.settings_service import SettingsService
@@ -70,3 +71,4 @@ class TestSettingsService:
         svc.reset_to_defaults()
         assert svc.get("editor.fontFamily") == "Cascadia Code, Consolas, Courier New, monospace"
         assert svc.get("editor.fontLigatures") is True
+        assert svc.get("editor.fontSize") == 12

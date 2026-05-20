@@ -13,6 +13,7 @@ from config.paths import SETTINGS_FILE
 
 
 DEFAULT_EDITOR_FONT_FAMILY = "Cascadia Code, Consolas, Courier New, monospace"
+DEFAULT_EDITOR_FONT_SIZE = 12
 
 EDITOR_FONT_PRESETS: tuple[str, ...] = (
     "Cascadia Code, Consolas, Courier New, monospace",
@@ -41,6 +42,7 @@ _DEFAULTS: dict[str, Any] = {
     "autosave_interval_seconds": 30,
     "editor.fontFamily": DEFAULT_EDITOR_FONT_FAMILY,
     "editor.fontLigatures": True,
+    "editor.fontSize": DEFAULT_EDITOR_FONT_SIZE,
 }
 
 

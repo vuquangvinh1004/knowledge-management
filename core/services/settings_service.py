@@ -25,6 +25,7 @@ _DEFAULTS: dict[str, object] = {
     "graph_virtualize_max_nodes": 120,
     "editor.fontFamily": "Cascadia Code, Consolas, Courier New, monospace",
     "editor.fontLigatures": True,
+    "editor.fontSize": 12,
 }
 
 

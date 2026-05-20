@@ -1394,6 +1394,15 @@ class TestMarkdownEditorSmoke:
         assert any(rng.format.fontFamily() == "Roboto Mono" for rng in formats)
         assert any(rng.format.foreground().color().isValid() for rng in formats)
 
+    def test_apply_editor_preferences_updates_font_size(self, qtbot):
+        from ui.widgets.markdown_editor import MarkdownEditorWidget
+
+        w = MarkdownEditorWidget()
+        qtbot.addWidget(w)
+        w.apply_editor_preferences("Consolas, monospace", True, 16)
+
+        assert w._editor.font().pointSize() == 16
+
 
 # ---------------------------------------------------------------------------
 # SettingsView smoke test
@@ -1411,7 +1420,21 @@ class TestSettingsViewSmoke:
         assert hasattr(v, "_btn_audit_source_notes")
         assert hasattr(v, "_combo_editor_font")
         assert hasattr(v, "_chk_editor_ligatures")
+        assert hasattr(v, "_spin_editor_font_size")
         assert hasattr(v, "_lbl_mode_info")
+
+    def test_load_settings_does_not_emit_editor_preferences_signal(self, qtbot):
+        from ui.views.settings_view import SettingsView
+
+        v = SettingsView()
+        qtbot.addWidget(v)
+        emitted: list[tuple[str, bool, int]] = []
+        v.editor_preferences_changed.connect(
+            lambda family, ligatures, size: emitted.append((family, ligatures, size))
+        )
+
+        v._load_settings()
+        assert emitted == []
 
     def test_mode_badge_uses_color_style(self, qtbot):
         from ui.views.settings_view import SettingsView

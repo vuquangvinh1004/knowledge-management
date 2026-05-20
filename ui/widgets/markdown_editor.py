@@ -36,7 +36,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.services.workspace_orchestrator import WorkspaceOrchestrator
-from config.settings import DEFAULT_EDITOR_FONT_FAMILY
+from config.settings import DEFAULT_EDITOR_FONT_FAMILY, DEFAULT_EDITOR_FONT_SIZE
 from core.utils.logger import get_logger
 
 logger = get_logger()
@@ -76,25 +76,8 @@ class _MarkdownSyntaxHighlighter(QSyntaxHighlighter):
 
     def __init__(self, parent) -> None:
         super().__init__(parent)
-
-        # Kích thước font: base=11pt, H1=14(+3), H2=13(+2), H3=12(+1), H4-H6=11(+0)
-        _BASE_PT = 11
-
-        def _hfmt(size: int) -> QTextCharFormat:
-            fmt = QTextCharFormat()
-            fmt.setForeground(QColor("#5B4B8A"))
-            fmt.setFontWeight(700)
-            fmt.setFontPointSize(size)
-            return fmt
-
-        self._heading_formats: dict[int, QTextCharFormat] = {
-            1: _hfmt(_BASE_PT + 3),
-            2: _hfmt(_BASE_PT + 2),
-            3: _hfmt(_BASE_PT + 1),
-            4: _hfmt(_BASE_PT),
-            5: _hfmt(_BASE_PT),
-            6: _hfmt(_BASE_PT),
-        }
+        self._heading_formats: dict[int, QTextCharFormat] = {}
+        self.set_heading_base_point_size(DEFAULT_EDITOR_FONT_SIZE)
 
         self._tag_format = QTextCharFormat()
         self._tag_format.setForeground(QColor("#1D4ED8"))
@@ -117,6 +100,26 @@ class _MarkdownSyntaxHighlighter(QSyntaxHighlighter):
         self._table_line_format.setBackground(QColor("#ECEFF3"))
 
         self._init_math_formats()
+
+    def set_heading_base_point_size(self, base_point_size: int) -> None:
+        """Điều chỉnh cỡ heading theo cỡ chữ editor hiện tại."""
+        base = max(10, min(24, int(base_point_size)))
+
+        def _hfmt(size: int) -> QTextCharFormat:
+            fmt = QTextCharFormat()
+            fmt.setForeground(QColor("#5B4B8A"))
+            fmt.setFontWeight(700)
+            fmt.setFontPointSize(size)
+            return fmt
+
+        self._heading_formats = {
+            1: _hfmt(base + 3),
+            2: _hfmt(base + 2),
+            3: _hfmt(base + 1),
+            4: _hfmt(base),
+            5: _hfmt(base),
+            6: _hfmt(base),
+        }
 
     def _init_math_formats(self) -> None:
         """Tạo palette math theo kiểu code editor, tự thích nghi dark/light."""
@@ -709,23 +712,53 @@ class MarkdownEditorWidget(QWidget):
             # Một số platform/font có thể không hỗ trợ feature tags.
             return
 
+    @staticmethod
+    def _coerce_bool(value: object, default: bool) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"1", "true", "yes", "on"}:
+                return True
+            if lowered in {"0", "false", "no", "off"}:
+                return False
+        if isinstance(value, (int, float)):
+            return bool(value)
+        return default
+
+    @staticmethod
+    def _coerce_font_size(value: object, default: int) -> int:
+        try:
+            size = int(value)
+        except (TypeError, ValueError):
+            return default
+        return max(10, min(24, size))
+
     def _apply_editor_font(self) -> None:
         """Áp dụng font editor từ cài đặt global."""
         from core.services.settings_service import SettingsService
 
         svc = SettingsService()
         font_family_setting = str(svc.get("editor.fontFamily", DEFAULT_EDITOR_FONT_FAMILY))
-        ligatures_enabled = bool(svc.get("editor.fontLigatures", True))
-        self.apply_editor_preferences(font_family_setting, ligatures_enabled)
+        ligatures_enabled = self._coerce_bool(svc.get("editor.fontLigatures", True), default=True)
+        font_size = self._coerce_font_size(
+            svc.get("editor.fontSize", DEFAULT_EDITOR_FONT_SIZE),
+            default=DEFAULT_EDITOR_FONT_SIZE,
+        )
+        self.apply_editor_preferences(font_family_setting, ligatures_enabled, font_size)
 
-    def apply_editor_preferences(self, font_family_setting: str, ligatures_enabled: bool) -> None:
-        """Public API: áp dụng font family + ligatures cho editor hiện tại."""
+    def apply_editor_preferences(self, font_family_setting: str, ligatures_enabled: bool, font_size: int) -> None:
+        """Public API: áp dụng font family + ligatures + font size cho editor hiện tại."""
         family = self._resolve_editor_font_family(font_family_setting)
-        editor_font = QFont(family, 12)
+        safe_size = self._coerce_font_size(font_size, default=DEFAULT_EDITOR_FONT_SIZE)
+        editor_font = QFont(family, safe_size)
         editor_font.setStyleHint(QFont.StyleHint.Monospace)
         self._apply_ligature_features(editor_font, ligatures_enabled)
         self._editor.setFont(editor_font)
         self._editor.setTabStopDistance(self._editor.fontMetrics().horizontalAdvance(" ") * 4)
+        if hasattr(self, "_syntax_highlighter"):
+            self._syntax_highlighter.set_heading_base_point_size(safe_size)
+            self._syntax_highlighter.rehighlight()
 
     def _refresh_blockquote_overlays(self) -> None:
         """Tô nền full-width cho blockquote và checklist để tăng phân biệt khi soạn thảo."""

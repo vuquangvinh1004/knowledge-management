@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from config.settings import DEFAULT_EDITOR_FONT_FAMILY, EDITOR_FONT_PRESETS
+from config.settings import DEFAULT_EDITOR_FONT_SIZE
 
 from core.utils.logger import get_logger
 
@@ -39,7 +40,7 @@ class SettingsView(QWidget):
 
     source_titles_normalized = Signal()
     wikilink_catalog_refreshed = Signal()
-    editor_preferences_changed = Signal(str, bool)
+    editor_preferences_changed = Signal(str, bool, int)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -150,6 +151,16 @@ class SettingsView(QWidget):
         self._chk_editor_ligatures.toggled.connect(self._on_editor_preferences_changed)
         form_editor.addRow("Ligatures:", self._chk_editor_ligatures)
 
+        self._spin_editor_font_size = QSpinBox()
+        self._spin_editor_font_size.setRange(10, 24)
+        self._spin_editor_font_size.setValue(DEFAULT_EDITOR_FONT_SIZE)
+        self._spin_editor_font_size.setSuffix(" pt")
+        self._spin_editor_font_size.setToolTip(
+            "Điều chỉnh cỡ chữ vùng ghi chú và soạn thảo Markdown"
+        )
+        self._spin_editor_font_size.valueChanged.connect(self._on_editor_preferences_changed)
+        form_editor.addRow("Cỡ chữ editor:", self._spin_editor_font_size)
+
         layout.addWidget(grp_editor)
 
         # --- Nhóm: Thông tin ---
@@ -183,9 +194,23 @@ class SettingsView(QWidget):
             svc = SettingsService()
             self._spin_backup_keep.setValue(int(svc.get("backup_keep_count", 10)))
             font_family = str(svc.get("editor.fontFamily", DEFAULT_EDITOR_FONT_FAMILY))
-            self._combo_editor_font.setCurrentText(font_family)
-            ligatures = bool(svc.get("editor.fontLigatures", True))
-            self._chk_editor_ligatures.setChecked(ligatures)
+            ligatures = self._coerce_bool(svc.get("editor.fontLigatures", True), default=True)
+            font_size = self._coerce_font_size(
+                svc.get("editor.fontSize", DEFAULT_EDITOR_FONT_SIZE),
+                default=DEFAULT_EDITOR_FONT_SIZE,
+            )
+
+            self._combo_editor_font.blockSignals(True)
+            self._chk_editor_ligatures.blockSignals(True)
+            self._spin_editor_font_size.blockSignals(True)
+            try:
+                self._combo_editor_font.setCurrentText(font_family)
+                self._chk_editor_ligatures.setChecked(ligatures)
+                self._spin_editor_font_size.setValue(font_size)
+            finally:
+                self._combo_editor_font.blockSignals(False)
+                self._chk_editor_ligatures.blockSignals(False)
+                self._spin_editor_font_size.blockSignals(False)
         except Exception as exc:
             logger.warning(f"Không thể tải cài đặt: {exc}")
 
@@ -199,12 +224,38 @@ class SettingsView(QWidget):
             if not font_family:
                 font_family = DEFAULT_EDITOR_FONT_FAMILY
             ligatures = self._chk_editor_ligatures.isChecked()
+            font_size = self._spin_editor_font_size.value()
 
             svc.set("editor.fontFamily", font_family)
             svc.set("editor.fontLigatures", ligatures)
-            self.editor_preferences_changed.emit(font_family, ligatures)
+            svc.set("editor.fontSize", font_size)
+            self.editor_preferences_changed.emit(font_family, ligatures, font_size)
         except Exception as exc:
             logger.warning(f"Không thể lưu cài đặt editor font: {exc}")
+
+    @staticmethod
+    def _coerce_bool(value: object, default: bool) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"1", "true", "yes", "on"}:
+                return True
+            if lowered in {"0", "false", "no", "off"}:
+                return False
+        if isinstance(value, (int, float)):
+            return bool(value)
+        return default
+
+    @staticmethod
+    def _coerce_font_size(value: object, default: int) -> int:
+        if not isinstance(value, (int, float, str)):
+            return default
+        try:
+            size = int(value)
+        except (TypeError, ValueError):
+            return default
+        return max(10, min(24, size))
 
     def set_mode_text(self, text: str) -> None:
         """Cập nhật mode hiển thị trong tab Thiết lập."""

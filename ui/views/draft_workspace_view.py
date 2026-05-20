@@ -290,9 +290,9 @@ class DraftWorkspaceView(QWidget):
             return False
         return False
 
-    def apply_editor_preferences(self, font_family: str, font_ligatures: bool) -> None:
+    def apply_editor_preferences(self, font_family: str, font_ligatures: bool, font_size: int) -> None:
         """Áp dụng font editor cho khung soạn thảo workspace."""
-        self._draft_editor.apply_editor_preferences(font_family, font_ligatures)
+        self._draft_editor.apply_editor_preferences(font_family, font_ligatures, font_size)
 
     def refresh_wikilink_catalog(self) -> None:
         """Làm mới dữ liệu wikilink tương tự các note editor khác."""
