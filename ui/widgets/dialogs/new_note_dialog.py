@@ -20,9 +20,9 @@ from core.services.note_service import NoteService
 
 
 _TYPE_ITEMS = (
-    ("concept_note", "Concept note"),
-    ("synthesis_note", "Synthesis note"),
-    ("board_note", "Board note"),
+    ("concept_note", "concept note"),
+    ("synthesis_note", "synthesis note"),
+    ("board_note", "board note"),
 )
 
 
@@ -40,7 +40,7 @@ class NewNoteDialog(QDialog):
         default_note_type: str | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Tạo note mới")
+        self.setWindowTitle("Tạo ghi chú mới")
         self.setMinimumSize(620, 500)
         self._notes_dir = Path(notes_dir) if notes_dir else None
         self._current_note_title = (current_note_title or "").strip()
@@ -92,10 +92,10 @@ class NewNoteDialog(QDialog):
         form.addRow("Tiêu đề:", self._edit_title)
 
         self._combo_scope = QComboBox()
-        self._combo_scope.addItem("Lưu vào Global", "global")
+        self._combo_scope.addItem("Lưu vào toàn cục", "global")
         if self._active_project_id is not None:
-            name = self._active_project_name or f"Project #{self._active_project_id}"
-            self._combo_scope.addItem(f"Lưu vào Project: {name}", "project")
+            name = self._active_project_name or f"Dự án #{self._active_project_id}"
+            self._combo_scope.addItem(f"Lưu vào dự án: {name}", "project")
             project_idx = self._combo_scope.findData("project")
             if project_idx >= 0:
                 self._combo_scope.setCurrentIndex(project_idx)
@@ -115,7 +115,7 @@ class NewNoteDialog(QDialog):
         self._button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
-        self._button_box.button(QDialogButtonBox.StandardButton.Ok).setText("Tạo note")
+        self._button_box.button(QDialogButtonBox.StandardButton.Ok).setText("Tạo ghi chú")
         self._button_box.button(QDialogButtonBox.StandardButton.Cancel).setText("Hủy")
         self._button_box.accepted.connect(self._on_accept)
         self._button_box.rejected.connect(self.reject)

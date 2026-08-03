@@ -1,0 +1,57 @@
+{
+  "window_width": 1280,
+  "window_height": 800,
+  "window_maximized": false,
+  "sidebar_width": 220,
+  "sidebar_collapsed": true,
+  "dual_pane_split": 0.5,
+  "theme": "light",
+  "last_opened_sources": [],
+  "autosave_interval_seconds": 30,
+  "editor.fontFamily": "Cascadia Code, Consolas, Courier New, monospace",
+  "editor.fontLigatures": true,
+  "editor.fontSize": 12,
+  "editor.insert_snippets.catalog": [
+    {
+      "snippet_id": "table",
+      "name": "| Table |",
+      "description": "Bảng Markdown với dòng căn lề mẫu.",
+      "template": "| Tiêu đề 1 | Tiêu đề 2 | Tiêu đề 3 |\n| :--- | :---: | ---: |\n| Căn trái | Căn giữa | Căn phải |\n| Dữ liệu | Dữ liệu | Dữ liệu |\n",
+      "built_in": true
+    },
+    {
+      "snippet_id": "math",
+      "name": "$$ Math $$",
+      "description": "Khối công thức toán học dạng display math.",
+      "template": "$$\nBiểu thức toán #(Eq.01)\n$$\n",
+      "built_in": true
+    },
+    {
+      "snippet_id": "checklist",
+      "name": "[x] Checklist",
+      "description": "Danh sách checkbox Markdown.",
+      "template": "- [ ] Công việc chưa làm\n- [x] Công việc đã hoàn thành\n",
+      "built_in": true
+    },
+    {
+      "snippet_id": "url",
+      "name": "[](URL)",
+      "description": "Liên kết Markdown với chữ hiển thị và URL.",
+      "template": "[Chữ hiển thị](https://example.com)\n",
+      "built_in": true
+    },
+    {
+      "snippet_id": "align",
+      "name": "&& Align",
+      "description": "Khối toán nhiều dòng với các điểm căn thẳng hàng.",
+      "template": "$$\n    &= [Biểu thức 1] \\\\n    &= [Biểu thức 2]\n$$\n",
+      "built_in": true
+    }
+  ],
+  "editor.insert_snippets.visible_ids": [
+    "table",
+    "math",
+    "checklist",
+    "url"
+  ]
+}

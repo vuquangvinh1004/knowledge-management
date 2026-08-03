@@ -1,6 +1,6 @@
-"""Màn hình Trang chính — tóm tắt và truy cập nhanh.
+"""Màn hình Trang chính - tóm tắt và truy cập nhanh.
 
-Business logic ĐOUTHỰỢC viết ở đây. Chỉ gọi service và phát tín hiệu.
+Business logic không được viết ở đây. Chỉ gọi service và phát tín hiệu.
 """
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ class DashboardView(QWidget):
         header.setObjectName("view_header")
         layout.addWidget(header)
 
-        # Stats bar
+        # Thanh thống kê
         self._stats_bar = self._build_stats_bar()
         layout.addWidget(self._stats_bar)
 
@@ -144,11 +144,11 @@ class DashboardView(QWidget):
             (self._lbl_sources, "Nguồn"),
             (self._lbl_notes, "Ghi chú"),
             (self._lbl_extracts, "Trích xuất"),
-            (self._lbl_source_notes, "Source note"),
-            (self._lbl_concept_notes, "Concept note"),
-            (self._lbl_synthesis_notes, "Synthesis note"),
-            (self._lbl_board_notes, "Board note"),
-            (self._lbl_orphan_notes, "Other notes"),
+            (self._lbl_source_notes, "source note"),
+            (self._lbl_concept_notes, "concept note"),
+            (self._lbl_synthesis_notes, "synthesis note"),
+            (self._lbl_board_notes, "board note"),
+            (self._lbl_orphan_notes, "Khác"),
         ]:
             col = QWidget()
             col_lay = QVBoxLayout(col)
@@ -248,7 +248,7 @@ class DashboardView(QWidget):
                 title=str(row.get("title") or "(không tiêu đề)"),
             )
             note_type = str(row.get("note_type") or "note")
-            scope = str(row.get("scope_label") or "Global")
+            scope = str(row.get("scope_label") or "Toàn cục")
             delete_state = int(row.get("is_deleted") or 0)
 
             stt_item = QTableWidgetItem(str(row_idx + 1))
@@ -282,7 +282,7 @@ class DashboardView(QWidget):
 
     @staticmethod
     def _display_title(note_type: str, title: str) -> str:
-        """Chuẩn hóa title hiển thị để tránh prefix dư thừa ở source_note cũ."""
+        """Chuẩn hóa title hiển thị để tránh prefix dư thừa ở source note cũ."""
         t = title.strip()
         if note_type == "source_note" and t.lower().startswith("source - "):
             return t[len("source - "):].strip()

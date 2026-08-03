@@ -33,9 +33,9 @@ class BoardSelectorPanel(QWidget):
         layout.setSpacing(6)
 
         row = QHBoxLayout()
-        self._lbl_title = QLabel("Boards")
-        self._btn_new = QPushButton("+ Board")
-        self._btn_new.setToolTip("Tạo board mới")
+        self._lbl_title = QLabel("Bảng")
+        self._btn_new = QPushButton("+ Bảng")
+        self._btn_new.setToolTip("Tạo bảng mới")
         self._btn_new.clicked.connect(self._on_create_board)
         row.addWidget(self._lbl_title)
         row.addStretch()
@@ -82,7 +82,7 @@ class BoardSelectorPanel(QWidget):
         return BoardService()
 
     def _on_create_board(self) -> None:
-        title, ok = QInputDialog.getText(self, "Tạo board", "Tên board mới:")
+        title, ok = QInputDialog.getText(self, "Tạo bảng", "Tên bảng mới:")
         if not ok or not title.strip():
             return
 
@@ -111,8 +111,8 @@ class BoardSelectorPanel(QWidget):
             return
 
         menu = QMenu(self)
-        act_rename = menu.addAction("Đổi tên board")
-        act_delete = menu.addAction("Xóa board")
+        act_rename = menu.addAction("Đổi tên bảng")
+        act_delete = menu.addAction("Xóa bảng")
         chosen = menu.exec(self._list.mapToGlobal(pos))
         if chosen is None:
             return
@@ -122,7 +122,7 @@ class BoardSelectorPanel(QWidget):
         if chosen == act_rename:
             new_title, ok = QInputDialog.getText(
                 self,
-                "Đổi tên board",
+                "Đổi tên bảng",
                 "Tên mới:",
                 text=item.text().split(" (", 1)[0],
             )
@@ -141,8 +141,8 @@ class BoardSelectorPanel(QWidget):
 
             reply = QMessageBox.question(
                 self,
-                "Xóa board",
-                "Xóa board này và toàn bộ dữ liệu hàng/cột/cell của board?",
+                "Xóa bảng",
+                "Xóa bảng này và toàn bộ dữ liệu hàng/cột/cell của bảng?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if reply != QMessageBox.StandardButton.Yes:

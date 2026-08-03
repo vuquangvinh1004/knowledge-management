@@ -48,7 +48,7 @@ class ProjectManagerDialog(QDialog):
         root.setContentsMargins(12, 12, 12, 12)
         root.setSpacing(8)
 
-        self._lbl_mode = QLabel("Mode hiện tại: Global")
+        self._lbl_mode = QLabel("Chế độ hiện tại: Toàn cục")
         self._lbl_mode.setObjectName("project_mode_label")
         root.addWidget(self._lbl_mode)
 
@@ -56,7 +56,7 @@ class ProjectManagerDialog(QDialog):
         content.setSpacing(10)
 
         left = QVBoxLayout()
-        left.addWidget(QLabel("Danh sách project"))
+        left.addWidget(QLabel("Danh sách dự án"))
         self._project_list = QListWidget()
         self._project_list.currentItemChanged.connect(self._on_project_changed)
         left.addWidget(self._project_list, stretch=1)
@@ -88,7 +88,7 @@ class ProjectManagerDialog(QDialog):
         self._btn_package.clicked.connect(self._on_package_project)
         left_actions2.addWidget(self._btn_package)
 
-        self._btn_global = QPushButton("Về Global")
+        self._btn_global = QPushButton("Về toàn cục")
         self._btn_global.clicked.connect(self._on_global_mode)
         left_actions2.addWidget(self._btn_global)
         left.addLayout(left_actions2)
@@ -98,7 +98,7 @@ class ProjectManagerDialog(QDialog):
         right = QHBoxLayout()
 
         col_global = QVBoxLayout()
-        col_global.addWidget(QLabel("Global notes"))
+        col_global.addWidget(QLabel("Ghi chú toàn cục"))
         self._global_notes = QListWidget()
         self._global_notes.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         col_global.addWidget(self._global_notes, stretch=1)
@@ -116,7 +116,7 @@ class ProjectManagerDialog(QDialog):
         right.addLayout(mid)
 
         col_refs = QVBoxLayout()
-        col_refs.addWidget(QLabel("Notes tham chiếu trong project"))
+        col_refs.addWidget(QLabel("Ghi chú tham chiếu trong dự án"))
         self._ref_notes = QListWidget()
         self._ref_notes.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         col_refs.addWidget(self._ref_notes, stretch=1)
@@ -171,19 +171,19 @@ class ProjectManagerDialog(QDialog):
     def _update_mode_label(self) -> None:
         active_id = self._project_service.get_active_project_id()
         if active_id is None:
-            self._lbl_mode.setText("Mode hiện tại: Global")
+            self._lbl_mode.setText("Chế độ hiện tại: Toàn cục")
             return
         try:
             p = self._project_service.get_project(active_id)
-            self._lbl_mode.setText(f"Mode hiện tại: Project - {p.name}")
+            self._lbl_mode.setText(f"Chế độ hiện tại: Dự án - {p.name}")
         except Exception:
-            self._lbl_mode.setText("Mode hiện tại: Global")
+            self._lbl_mode.setText("Chế độ hiện tại: Toàn cục")
 
     def _on_project_changed(self, _current, _previous) -> None:
         self._reload_project_refs()
 
     def _on_create_project(self) -> None:
-        name, ok = QInputDialog.getText(self, "Tạo project", "Tên project:")
+        name, ok = QInputDialog.getText(self, "Tạo dự án", "Tên dự án:")
         if not ok:
             return
         try:
@@ -197,7 +197,7 @@ class ProjectManagerDialog(QDialog):
         if pid is None:
             return
         current = self._project_service.get_project(pid)
-        name, ok = QInputDialog.getText(self, "Đổi tên project", "Tên mới:", text=current.name)
+        name, ok = QInputDialog.getText(self, "Đổi tên dự án", "Tên mới:", text=current.name)
         if not ok:
             return
         try:
@@ -229,8 +229,8 @@ class ProjectManagerDialog(QDialog):
             return
         reply = QMessageBox.question(
             self,
-            "Kết thúc project",
-            "Đánh dấu project này là đã kết thúc?",
+            "Kết thúc dự án",
+            "Đánh dấu dự án này là đã kết thúc?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
@@ -249,8 +249,8 @@ class ProjectManagerDialog(QDialog):
             return
         reply = QMessageBox.question(
             self,
-            "Xóa mềm project",
-            "Xóa mềm project này? Các note project-only sẽ trở về Global.",
+            "Xóa mềm dự án",
+            "Xóa mềm dự án này? Các ghi chú chỉ thuộc dự án sẽ trở về toàn cục.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
@@ -265,14 +265,14 @@ class ProjectManagerDialog(QDialog):
     def _on_package_project(self) -> None:
         pid = self._selected_project_id()
         if pid is None:
-            QMessageBox.information(self, "Đóng gói project", "Vui lòng chọn project trước.")
+            QMessageBox.information(self, "Đóng gói dự án", "Vui lòng chọn dự án trước.")
             return
 
         from config.paths import EXPORTS_DIR
 
         target = QFileDialog.getExistingDirectory(
             self,
-            "Chọn thư mục lưu gói project",
+            "Chọn thư mục lưu gói dự án",
             str(EXPORTS_DIR),
         )
         if not target:
@@ -283,7 +283,7 @@ class ProjectManagerDialog(QDialog):
             reply = QMessageBox.question(
                 self,
                 "Đóng gói thành công",
-                f"Đã xuất gói project tại:\n{path}\n\nBạn có muốn mở thư mục này ngay không?",
+                f"Đã xuất gói dự án tại:\n{path}\n\nBạn có muốn mở thư mục này ngay không?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if reply == QMessageBox.StandardButton.Yes:
@@ -294,7 +294,7 @@ class ProjectManagerDialog(QDialog):
     def _on_add_refs(self) -> None:
         pid = self._selected_project_id()
         if pid is None:
-            QMessageBox.information(self, "Thêm note", "Vui lòng chọn project trước.")
+            QMessageBox.information(self, "Thêm ghi chú", "Vui lòng chọn dự án trước.")
             return
         selected = self._global_notes.selectedItems()
         if not selected:

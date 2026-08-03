@@ -232,10 +232,10 @@ class GraphViewWidget(QWidget):
 
     _NOTE_TYPE_OPTIONS = [
         ("Tất cả", None),
-        ("Ghi chú nguồn", "source_note"),
-        ("Ghi chú khái niệm", "concept_note"),
-        ("Ghi chú tổng hợp", "synthesis_note"),
-        ("Ghi chú board", "board_note"),
+        ("source note", "source_note"),
+        ("concept note", "concept_note"),
+        ("synthesis note", "synthesis_note"),
+        ("board note", "board_note"),
     ]
 
     _HOP_OPTIONS = [

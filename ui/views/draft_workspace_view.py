@@ -36,6 +36,10 @@ class DraftWorkspaceView(QWidget):
 
     source_opened = Signal(int)
     import_requested = Signal()
+    text_extract_requested = Signal(int, int, tuple)
+    table_extract_requested = Signal(int, int, tuple)
+    image_extract_requested = Signal(int, int, tuple)
+    source_page_changed_requested = Signal(int, int)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -63,20 +67,20 @@ class DraftWorkspaceView(QWidget):
         header_lay.setSpacing(8)
 
         self._btn_new_md = QPushButton("Tệp mới")
-        self._btn_new_md.setToolTip("Tạo file soạn thảo markdown mới")
+        self._btn_new_md.setToolTip("Tạo tệp soạn thảo Markdown mới")
         self._btn_new_md.clicked.connect(self._new_scratch_file)
 
-        self._btn_open_md = QPushButton("Mở .md")
-        self._btn_open_md.setToolTip("Mở file Markdown (.md)")
+        self._btn_open_md = QPushButton("Mở tệp Markdown")
+        self._btn_open_md.setToolTip("Mở tệp Markdown (.md)")
         self._btn_open_md.clicked.connect(self._open_scratch_file)
 
         self._btn_save_md = QPushButton("Lưu")
-        self._btn_save_md.setToolTip("Lưu file Markdown hiện tại (Ctrl+S)")
+        self._btn_save_md.setToolTip("Lưu tệp Markdown hiện tại (Ctrl+S)")
         self._btn_save_md.setObjectName("primary_button")
         self._btn_save_md.clicked.connect(self.request_save_scratch_file)
 
         self._btn_save_as_md = QPushButton("Lưu thành...")
-        self._btn_save_as_md.setToolTip("Lưu thành file Markdown khác (Ctrl+Shift+S)")
+        self._btn_save_as_md.setToolTip("Lưu thành tệp Markdown khác (Ctrl+Shift+S)")
         self._btn_save_as_md.clicked.connect(lambda: self.request_save_scratch_file(force_pick_path=True))
 
         self._btn_extract_text = QPushButton("Trích văn bản")
@@ -131,7 +135,7 @@ class DraftWorkspaceView(QWidget):
         header_lay.addWidget(self._btn_toggle_right)
 
         self._btn_insert_snippet = QPushButton("Chèn...")
-        self._btn_insert_snippet.setToolTip("Chèn nhanh đối tượng Markdown vào vùng soạn thảo")
+        self._btn_insert_snippet.setToolTip("Chèn nhanh mẫu Markdown vào vùng soạn thảo")
         self._btn_insert_snippet.setProperty("workspaceRole", "insert-action")
         self._btn_insert_snippet.clicked.connect(self._open_insert_menu)
         header_lay.addWidget(self._btn_insert_snippet)
@@ -244,7 +248,7 @@ class DraftWorkspaceView(QWidget):
         if force_pick_path or file_path is None:
             selected, _ = QFileDialog.getSaveFileName(
                 self,
-                "Lưu file Markdown",
+                "Lưu tệp Markdown",
                 str((self._scratch_file_path or Path.cwd() / "workspace-nhap.md")),
                 "Markdown (*.md)",
             )
@@ -255,7 +259,7 @@ class DraftWorkspaceView(QWidget):
         try:
             file_path.write_text(self._draft_editor.get_content(), encoding="utf-8")
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Lỗi", f"Không thể lưu file Markdown:\n{exc}")
+            QMessageBox.critical(self, "Lỗi", f"Không thể lưu tệp Markdown:\n{exc}")
             return False
 
         self._scratch_file_path = file_path
@@ -271,9 +275,9 @@ class DraftWorkspaceView(QWidget):
 
         dlg = QMessageBox(self)
         dlg.setIcon(QMessageBox.Icon.Warning)
-        dlg.setWindowTitle("Lưu file markdown")
+        dlg.setWindowTitle("Lưu tệp Markdown")
         dlg.setText("Nội dung soạn thảo trong Không gian làm việc chưa được lưu.")
-        dlg.setInformativeText("Bạn muốn lưu file .md trước khi đóng ứng dụng không?")
+        dlg.setInformativeText("Bạn muốn lưu tệp .md trước khi đóng ứng dụng không?")
 
         btn_save = dlg.addButton("Lưu", QMessageBox.ButtonRole.AcceptRole)
         btn_discard = dlg.addButton("Không lưu", QMessageBox.ButtonRole.DestructiveRole)
@@ -298,13 +302,36 @@ class DraftWorkspaceView(QWidget):
         """Làm mới dữ liệu wikilink tương tự các note editor khác."""
         self._draft_editor.refresh_wikilink_catalog()
 
+    def current_pdf_viewer(self) -> PDFViewerWidget | None:
+        """Trả về viewer PDF đang được chọn, nếu có."""
+        idx = self._current_reference_index()
+        if 0 <= idx < len(self._pdf_viewers):
+            return self._pdf_viewers[idx]
+        return None
+
+    def pdf_viewer_for_source(self, source_id: int) -> PDFViewerWidget | None:
+        """Lấy viewer PDF theo source_id."""
+        if source_id not in self._source_ids:
+            return None
+        idx = self._source_ids.index(source_id)
+        if 0 <= idx < len(self._pdf_viewers):
+            return self._pdf_viewers[idx]
+        return None
+
+    def source_code_for_source(self, source_id: int) -> str | None:
+        """Lấy source code theo source_id."""
+        if source_id not in self._source_ids:
+            return None
+        idx = self._source_ids.index(source_id)
+        return self._source_codes[idx] if idx < len(self._source_codes) else None
+
     def _open_scratch_file(self) -> None:
         if not self._confirm_replace_unsaved_content():
             return
 
         selected, _ = QFileDialog.getOpenFileName(
             self,
-            "Mở file Markdown",
+            "Mở tệp Markdown",
             str(Path.cwd()),
             "Markdown (*.md)",
         )
@@ -315,7 +342,7 @@ class DraftWorkspaceView(QWidget):
         try:
             content = file_path.read_text(encoding="utf-8")
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Lỗi", f"Không thể mở file Markdown:\n{exc}")
+            QMessageBox.critical(self, "Lỗi", f"Không thể mở tệp Markdown:\n{exc}")
             return
 
         self._scratch_file_path = file_path
@@ -420,123 +447,23 @@ class DraftWorkspaceView(QWidget):
     def _on_text_selected(self, source_id: int, page_no: int, pdf_rect: tuple) -> None:
         if source_id not in self._source_ids:
             return
-
-        idx = self._source_ids.index(source_id)
-        viewer = self._pdf_viewers[idx]
-        if not viewer.file_path:
-            return
-
-        from core.extraction.pdf_text import extract_region_text
-
-        doc = viewer._doc
-        if doc is None:
-            return
-
-        raw = extract_region_text(doc, page_no, pdf_rect)
-        if not raw.strip():
-            QMessageBox.information(self, "Thông tin", "Vùng đã chọn không có văn bản.")
-            self._reset_extraction_mode()
-            return
-
-        text, anchor = self._orchestrator.prepare_text_extract(source_id, page_no, pdf_rect, raw)
-        source_code = self._source_codes[idx] if idx < len(self._source_codes) else None
-        extract_id = self._orchestrator.commit_extract(
-            source_id=source_id,
-            page_no=page_no,
-            extract_type="text",
-            source_anchor=anchor,
-            content_md=text,
-            note_id=None,
-        )
-        self._draft_editor.insert_extract(
-            text,
-            anchor,
-            source_code=source_code,
-            page_no=page_no,
-            extract_id=extract_id,
-            rect=pdf_rect,
-        )
+        self.text_extract_requested.emit(source_id, page_no, pdf_rect)
         self._reset_extraction_mode()
 
     def _on_table_selected(self, source_id: int, page_no: int, pdf_rect: tuple) -> None:
         if source_id not in self._source_ids:
             return
-
-        idx = self._source_ids.index(source_id)
-        viewer = self._pdf_viewers[idx]
-        if not viewer.file_path:
-            return
-
-        from core.extraction.normalizers import table_to_markdown
-        from core.extraction.pdf_table import extract_table_from_region
-        from ui.widgets.dialogs.table_preview_dialog import TablePreviewDialog
-
-        rows = extract_table_from_region(viewer.file_path, page_no, pdf_rect)
-        if not rows:
-            QMessageBox.information(self, "Thông tin", "Không phát hiện bảng trong vùng đã chọn.")
-            self._reset_extraction_mode()
-            return
-
-        table_md = table_to_markdown(rows)
-        anchor = self._orchestrator.build_anchor(source_id, page_no, pdf_rect)
-        source_code = self._source_codes[idx] if idx < len(self._source_codes) else None
-
-        dlg = TablePreviewDialog(table_md, anchor, self)
-        if dlg.exec():
-            extract_id = self._orchestrator.commit_extract(
-                source_id=source_id,
-                page_no=page_no,
-                extract_type="table",
-                source_anchor=anchor,
-                content_md=table_md,
-                note_id=None,
-            )
-            self._draft_editor.insert_table(
-                table_md,
-                anchor,
-                source_code=source_code,
-                page_no=page_no,
-                extract_id=extract_id,
-                rect=pdf_rect,
-            )
-
+        self.table_extract_requested.emit(source_id, page_no, pdf_rect)
         self._reset_extraction_mode()
 
     def _on_image_selected(self, source_id: int, page_no: int, pdf_rect: tuple) -> None:
         if source_id not in self._source_ids:
             return
-
-        idx = self._source_ids.index(source_id)
-        viewer = self._pdf_viewers[idx]
-        if not viewer.file_path:
-            return
-
-        from core.extraction.pdf_image import capture_region
-
-        doc = viewer._doc
-        if doc is None:
-            return
-
-        try:
-            img_bytes = capture_region(doc, page_no, pdf_rect)
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Lỗi", f"Không thể chụp ảnh:\n{exc}")
-            self._reset_extraction_mode()
-            return
-
-        try:
-            asset_path = self._orchestrator.save_image_asset(source_id, None, img_bytes)
-            self._draft_editor.insert_asset_ref(asset_path, "")
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Lỗi", f"Không thể lưu ảnh:\n{exc}")
-
+        self.image_extract_requested.emit(source_id, page_no, pdf_rect)
         self._reset_extraction_mode()
 
     def _on_source_page_changed(self, source_id: int, page_no: int) -> None:
-        try:
-            SourceService().update_last_opened_page(source_id, page_no)
-        except Exception:
-            return
+        self.source_page_changed_requested.emit(source_id, page_no)
 
     def _toggle_reference_panel(self) -> None:
         if self._left_panel.isVisible() and not self._right_panel.isVisible():

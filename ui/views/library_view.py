@@ -34,7 +34,7 @@ class LibraryView(QWidget):
 
     Signals:
         open_reference_requested(int): Khi người dùng muốn mở PDF tham khảo trong Workspace.
-        create_source_note_requested(int): Khi người dùng xác nhận tạo source_note từ source đã chọn.
+        create_source_note_requested(int): Khi người dùng xác nhận tạo source note từ source đã chọn.
         import_requested: Khi nhấn nút Nhập nguồn.
     """
 
@@ -141,11 +141,11 @@ class LibraryView(QWidget):
         self._populate_list(self._sources)
 
     def start_source_note_creation_mode(self) -> None:
-        """Bật chế độ chọn tài liệu để tạo source_note từ GC Nguồn."""
+        """Bật chế độ chọn tài liệu để tạo source note từ thư viện nguồn."""
         self._source_note_creation_mode = True
 
     def end_source_note_creation_mode(self) -> None:
-        """Tắt chế độ tạo source_note theo lựa chọn tài liệu."""
+        """Tắt chế độ tạo source note theo lựa chọn tài liệu."""
         self._source_note_creation_mode = False
 
     def set_project_context(self, project_id: int | None) -> None:
@@ -245,7 +245,7 @@ class LibraryView(QWidget):
         menu = QMenu(self)
         act_create_source_note = None
         if self._source_note_creation_mode:
-            act_create_source_note = menu.addAction("📝  Tạo source_note")
+            act_create_source_note = menu.addAction("📝  Tạo source note")
         act_open_reference = menu.addAction("📄  Mở tài liệu")
         act_edit = menu.addAction("✏  Chỉnh sửa thông tin")
         act_delete = menu.addAction("❌  Xóa khỏi thư viện")

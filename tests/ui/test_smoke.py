@@ -75,7 +75,7 @@ class TestMainWindowSmoke:
         win = MainWindow()
         qtbot.addWidget(win)
         assert hasattr(win._settings_view, "_lbl_mode_info")
-        assert "Mode:" in win._settings_view._lbl_mode_info.text()
+        assert "Chế độ:" in win._settings_view._lbl_mode_info.text()
 
     def test_main_window_has_no_toolbar_project_button(self, qtbot, db_session):
         from ui.main_window import MainWindow
@@ -862,7 +862,7 @@ class TestNewNoteDialogSmoke:
 
         dlg = NewNoteDialog()
         qtbot.addWidget(dlg)
-        assert dlg.windowTitle() == "Tạo note mới"
+        assert dlg.windowTitle() == "Tạo ghi chú mới"
         assert dlg.note_type in {"concept_note", "synthesis_note", "board_note"}
 
     def test_new_note_dialog_default_markers(self, qtbot):

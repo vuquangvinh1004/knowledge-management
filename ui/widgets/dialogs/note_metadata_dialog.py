@@ -21,7 +21,7 @@ class NoteMetadataDialog(QDialog):
         self._note_id = note_id
         self._note_type = note_type
         self._note_service = note_service
-        self.setWindowTitle("Metadata note")
+        self.setWindowTitle("Metadata ghi chú")
         self.setMinimumWidth(460)
         self._build_ui()
         self._load_meta()

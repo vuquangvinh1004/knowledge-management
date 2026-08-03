@@ -1,4 +1,4 @@
-"""Màn hình Research Board — tổng hợp nghiên cứu liên tài liệu.
+"""Màn hình bảng tổng hợp nghiên cứu liên tài liệu.
 
 Board là bảng rows × cols. Người dùng click vào cell để chỉnh sửa nội dung.
 Business logic KHÔNG nằm ở đây — gọi qua BoardService.
@@ -7,60 +7,31 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QDialog,
-    QDialogButtonBox,
     QHBoxLayout,
-    QLabel,
     QMenu,
-    QMessageBox,
-    QPlainTextEdit,
-    QPushButton,
     QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
+    QPushButton,
+    QLabel,
     QToolBar,
     QVBoxLayout,
     QWidget,
     QHeaderView,
 )
 
-from ui.widgets.empty_state import EmptyStateWidget
-from ui.widgets.dialogs.board_criteria_manager_dialog import BoardCriteriaManagerDialog
-from core.utils.constants import BOARD_META_ANALYSIS_CRITERIA
-from core.utils.logger import get_logger
-
-logger = get_logger()
-
-
-class _CellEditDialog(QDialog):
-    """Dialog chỉnh sửa nội dung một cell."""
-
-    def __init__(self, current_content: str, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setWindowTitle("Chỉnh sửa ô")
-        self.setMinimumSize(400, 260)
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Nội dung Markdown:"))
-        self._editor = QPlainTextEdit()
-        self._editor.setPlainText(current_content)
-        layout.addWidget(self._editor)
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-
-    @property
-    def content(self) -> str:
-        return self._editor.toPlainText()
-
 
 class BoardView(QWidget):
-    """Research Board — tổng hợp nghiên cứu liên tài liệu."""
+    """Bảng tổng hợp nghiên cứu liên tài liệu."""
 
     note_open_requested = Signal(int)
     source_open_requested = Signal(int)
+    sync_requested = Signal()
+    export_markdown_requested = Signal()
+    export_csv_requested = Signal()
+    customize_requested = Signal()
+    graph_view_requested = Signal()
+    cell_edit_requested = Signal(int, int)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -83,19 +54,19 @@ class BoardView(QWidget):
         toolbar = QToolBar()
         toolbar.setMovable(False)
 
-        self._btn_add_row = QPushButton("Đồng bộ nguồn")
-        self._btn_add_row.setToolTip("Đồng bộ 1 hàng = 1 source_note cho board hiện tại")
-        self._btn_add_row.clicked.connect(self._sync_source_rows)
+        self._btn_add_row = QPushButton("Đồng bộ source note")
+        self._btn_add_row.setToolTip("Đồng bộ 1 hàng = 1 source note cho bảng hiện tại")
+        self._btn_add_row.clicked.connect(self._request_sync)
         toolbar.addWidget(self._btn_add_row)
 
         toolbar.addSeparator()
 
         self._btn_export_md = QPushButton("Xuất Markdown")
-        self._btn_export_md.clicked.connect(self._export_markdown)
+        self._btn_export_md.clicked.connect(self._request_export_markdown)
         toolbar.addWidget(self._btn_export_md)
 
         self._btn_export_csv = QPushButton("Xuất CSV")
-        self._btn_export_csv.clicked.connect(self._export_csv)
+        self._btn_export_csv.clicked.connect(self._request_export_csv)
         toolbar.addWidget(self._btn_export_csv)
 
         toolbar.addSeparator()
@@ -103,24 +74,38 @@ class BoardView(QWidget):
         self._btn_customize = QPushButton("Tùy chỉnh")
         self._btn_customize.setObjectName("btnCustomize")
         self._btn_customize.setToolTip("Quản lý tiêu chí: thêm, xóa, sửa, sắp xếp")
-        self._btn_customize.clicked.connect(self._open_criteria_manager)
+        self._btn_customize.clicked.connect(self._request_customize)
         toolbar.addWidget(self._btn_customize)
 
         self._btn_graph_view = QPushButton("Đồ thị liên kết")
         self._btn_graph_view.setObjectName("btnGraphView")
         self._btn_graph_view.setToolTip("Mở đồ thị liên kết ghi chú")
-        self._btn_graph_view.clicked.connect(self._open_graph_view)
+        self._btn_graph_view.clicked.connect(self._request_graph_view)
         toolbar.addWidget(self._btn_graph_view)
 
         layout.addWidget(toolbar)
 
         # Empty state
-        self._empty_state = EmptyStateWidget(
-            "Chưa có source_note để tổng hợp.\nHãy thêm nguồn PDF và tạo source_note trước.",
-            action_label="Đồng bộ source_note",
+        self._empty_state = QWidget()
+        empty_layout = QHBoxLayout(self._empty_state)
+        empty_layout.setContentsMargins(8, 8, 8, 8)
+        empty_layout.setSpacing(12)
+
+        self._empty_state_label = QLabel(
+            "Chưa có source note để tổng hợp. Hãy thêm nguồn PDF và tạo source note trước."
         )
-        if self._empty_state.action_button:
-            self._empty_state.action_button.clicked.connect(self._sync_source_rows)
+        self._empty_state_label.setWordWrap(False)
+        self._empty_state_label.setObjectName("empty_state_message")
+        self._empty_state_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+
+        self._empty_state_button = QPushButton("Đồng bộ source note")
+        self._empty_state_button.clicked.connect(self._request_sync)
+
+        empty_layout.addWidget(self._empty_state_label)
+        empty_layout.addStretch()
+        empty_layout.addWidget(self._empty_state_button)
         layout.addWidget(self._empty_state)
 
         # Table widget
@@ -144,6 +129,10 @@ class BoardView(QWidget):
     def _get_service(self):
         from core.services.board_service import BoardService
         return BoardService()
+
+    @property
+    def active_board_id(self) -> int | None:
+        return self._active_board_id
 
     # ------------------------------------------------------------------
     # Refresh
@@ -178,7 +167,7 @@ class BoardView(QWidget):
         """Dựng lại QTableWidget từ rows/cols/cells."""
         svc = self._get_service()
         # Hiển thị transpose:
-        # - source_note rows -> cột ngang
+        # - source note rows -> cột ngang
         # - tiêu chí (columns) -> hàng dọc bên trái
         self._table.setRowCount(len(self._cols))
         self._table.setColumnCount(len(self._rows))
@@ -220,7 +209,7 @@ class BoardView(QWidget):
         self._btn_export_csv.setEnabled(bool(self._rows))
 
     def set_project_context(self, project_id: int | None) -> None:
-        """Áp dụng project scope để đồng bộ source_note theo ngữ cảnh hiện tại."""
+        """Áp dụng project scope để đồng bộ source note theo ngữ cảnh hiện tại."""
         self._project_id = project_id
         self.refresh()
 
@@ -229,16 +218,7 @@ class BoardView(QWidget):
     # ------------------------------------------------------------------
 
     def _sync_source_rows(self) -> None:
-        svc = self._get_service()
-        svc.sync_rows_with_source_notes(
-            board_id=self._active_board_id,
-            project_id=self._project_id,
-        )
-        svc.sync_cells_from_source_note_metadata(
-            board_id=self._active_board_id,
-            project_id=self._project_id,
-        )
-        self.refresh()
+        self._request_sync()
 
     # ------------------------------------------------------------------
     # Cell edit
@@ -249,20 +229,7 @@ class BoardView(QWidget):
             return
         col = self._cols[row_idx]
         row = self._rows[col_idx]
-
-        svc = self._get_service()
-        existing_cell = svc.get_cell(row.id, col.id, board_id=self._active_board_id)
-        current_content = existing_cell.content_md if existing_cell else ""
-
-        dlg = _CellEditDialog(current_content, self)
-        if dlg.exec():
-            svc.update_cell(
-                row.id,
-                col.id,
-                content_md=dlg.content,
-                board_id=self._active_board_id,
-            )
-            self.refresh()
+        self.cell_edit_requested.emit(int(row.id), int(col.id))
 
     # ------------------------------------------------------------------
     # Context menu
@@ -270,119 +237,52 @@ class BoardView(QWidget):
 
     def _show_context_menu(self, pos) -> None:
         menu = QMenu(self)
-        action_sync_rows = menu.addAction("Đồng bộ lại từ source_note")
+        action_sync_rows = menu.addAction("Đồng bộ lại từ source note")
 
         action = menu.exec(self._table.viewport().mapToGlobal(pos))
         if not action:
             return
 
         if action == action_sync_rows:
-            self._sync_source_rows()
+            self._request_sync()
 
     # ------------------------------------------------------------------
     # Export
     # ------------------------------------------------------------------
 
     def _export_markdown(self) -> None:
-        try:
-            from config.paths import EXPORTS_DIR
-            from core.services.export_service import ExportService
-            svc = ExportService(EXPORTS_DIR)
-            path = svc.export_board_markdown(board_id=self._active_board_id)
-            QMessageBox.information(self, "Xuất thành công", f"Đã xuất:\n{path}")
-        except Exception as exc:
-            QMessageBox.warning(self, "Lỗi xuất", str(exc))
+        self._request_export_markdown()
 
     def _export_csv(self) -> None:
-        try:
-            from config.paths import EXPORTS_DIR
-            from core.services.export_service import ExportService
-            svc = ExportService(EXPORTS_DIR)
-            path = svc.export_board_csv(board_id=self._active_board_id)
-            QMessageBox.information(self, "Xuất thành công", f"Đã xuất:\n{path}")
-        except Exception as exc:
-            QMessageBox.warning(self, "Lỗi xuất", str(exc))
+        self._request_export_csv()
 
     # ------------------------------------------------------------------
     # Graph view
     # ------------------------------------------------------------------
 
     def _open_graph_view(self) -> None:
-        """Mở dialog Graph view dựa trên GraphService."""
-        from ui.widgets.graph_view import GraphViewWidget
-
-        dlg = QDialog(self)
-        dlg.setWindowTitle("Đồ thị liên kết (Graph view)")
-        dlg.setMinimumSize(980, 640)
-
-        layout = QVBoxLayout(dlg)
-        graph = GraphViewWidget(dlg)
-        graph.note_open_requested.connect(self.note_open_requested)
-        graph.source_open_requested.connect(self.source_open_requested)
-        layout.addWidget(graph)
-
-        action_row = QHBoxLayout()
-
-        btn_fullscreen = QPushButton("Toàn màn hình")
-        btn_fullscreen.setCheckable(True)
-
-        def _toggle_fullscreen(checked: bool) -> None:
-            if checked:
-                dlg.showFullScreen()
-                btn_fullscreen.setText("Thoát toàn màn hình")
-            else:
-                dlg.showNormal()
-                btn_fullscreen.setText("Toàn màn hình")
-
-        btn_fullscreen.toggled.connect(_toggle_fullscreen)
-        action_row.addWidget(btn_fullscreen)
-        action_row.addStretch()
-
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        buttons.rejected.connect(dlg.reject)
-        buttons.accepted.connect(dlg.accept)
-        buttons.button(QDialogButtonBox.StandardButton.Close).setText("Đóng")
-
-        action_row.addWidget(buttons)
-        layout.addLayout(action_row)
-
-        dlg.exec()
+        self._request_graph_view()
 
     # ------------------------------------------------------------------
     # Customize criteria
     # ------------------------------------------------------------------
 
     def _open_criteria_manager(self) -> None:
-        """Mở dialog quản lý tiêu chí bảng."""
-        svc = self._get_service()
-        if self._active_board_id is None:
-            QMessageBox.warning(self, "Lỗi", "Chưa có board nào được chọn!")
-            return
+        self._request_customize()
 
-        svc.get_board(self._active_board_id)
-        svc.ensure_full_meta_columns(board_id=self._active_board_id)
+    def _request_sync(self) -> None:
+        self.sync_requested.emit()
 
-        system_labels = set(BOARD_META_ANALYSIS_CRITERIA)
-        criteria = [
-            {
-                "id": col.id,
-                "label": col.label,
-                "visible": bool(getattr(col, "is_visible", True)),
-                "locked": col.label in system_labels,
-            }
-            for col in svc.list_columns(self._active_board_id)
-        ]
+    def _request_export_markdown(self) -> None:
+        self.export_markdown_requested.emit()
 
-        dlg = BoardCriteriaManagerDialog(criteria, self)
-        if dlg.exec():
-            configurations = dlg.get_configurations()
+    def _request_export_csv(self) -> None:
+        self.export_csv_requested.emit()
 
-            try:
-                svc.apply_column_configuration(self._active_board_id, configurations)
-                QMessageBox.information(self, "Thành công", "Tiêu chí đã được cập nhật.")
-                self.refresh()
-            except Exception as exc:
-                logger.exception("Error updating board criteria")
-                QMessageBox.warning(self, "Lỗi", f"Không thể cập nhật tiêu chí: {exc}")
+    def _request_customize(self) -> None:
+        self.customize_requested.emit()
+
+    def _request_graph_view(self) -> None:
+        self.graph_view_requested.emit()
 
 

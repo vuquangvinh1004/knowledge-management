@@ -136,6 +136,12 @@ class MainWindow(QMainWindow):
         # Board / Graph view relay
         self._board_view.note_open_requested.connect(self._open_note_in_workspace)
         self._board_view.source_open_requested.connect(self._open_source_in_workspace)
+        self._board_view.sync_requested.connect(self._sync_board_with_source_notes)
+        self._board_view.export_markdown_requested.connect(self._export_board_markdown)
+        self._board_view.export_csv_requested.connect(self._export_board_csv)
+        self._board_view.customize_requested.connect(self._open_board_criteria_manager)
+        self._board_view.graph_view_requested.connect(self._open_board_graph_view)
+        self._board_view.cell_edit_requested.connect(self._edit_board_cell)
 
         # Note management actions
         self._note_management_view.note_open_requested.connect(self._open_note_in_workspace)
@@ -153,8 +159,19 @@ class MainWindow(QMainWindow):
 
         # Draft workspace relay
         self._workspace_view.import_requested.connect(self._open_import_dialog)
+        self._workspace_view.text_extract_requested.connect(self._extract_text_from_workspace)
+        self._workspace_view.table_extract_requested.connect(self._extract_table_from_workspace)
+        self._workspace_view.image_extract_requested.connect(self._capture_image_from_workspace)
+        self._workspace_view.source_page_changed_requested.connect(self._update_last_opened_page_from_workspace)
 
         # Settings maintenance actions
+        self._settings_view.backup_requested.connect(self._do_backup_from_settings)
+        self._settings_view.rebuild_fts_requested.connect(self._rebuild_fts_from_settings)
+        self._settings_view.reset_settings_requested.connect(self._reset_settings_from_settings)
+        self._settings_view.normalize_source_titles_requested.connect(self._normalize_source_titles_from_settings)
+        self._settings_view.refresh_wikilink_catalog_requested.connect(self._refresh_wikilink_catalog_from_settings)
+        self._settings_view.cleanup_unused_notes_requested.connect(self._cleanup_unused_notes_from_settings)
+        self._settings_view.audit_missing_source_note_files_requested.connect(self._audit_missing_source_note_files_from_settings)
         self._settings_view.source_titles_normalized.connect(self._on_note_catalog_changed)
         self._settings_view.wikilink_catalog_refreshed.connect(self._on_note_catalog_changed)
         self._settings_view.editor_preferences_changed.connect(self._on_editor_preferences_changed)
@@ -209,6 +226,34 @@ class MainWindow(QMainWindow):
         """Tạo backup DB."""
         mwh.do_backup(self)
 
+    def _do_backup_from_settings(self, keep_count: int) -> None:
+        """Tạo backup từ tab Thiết lập."""
+        mwh.do_backup_from_settings(self, keep_count)
+
+    def _rebuild_fts_from_settings(self) -> None:
+        """Rebuild FTS index từ tab Thiết lập."""
+        mwh.rebuild_fts_index(self)
+
+    def _reset_settings_from_settings(self) -> None:
+        """Khôi phục cài đặt mặc định từ tab Thiết lập."""
+        mwh.reset_settings(self)
+
+    def _normalize_source_titles_from_settings(self) -> None:
+        """Chuẩn hóa source-note titles từ tab Thiết lập."""
+        mwh.normalize_source_note_titles(self)
+
+    def _refresh_wikilink_catalog_from_settings(self) -> None:
+        """Làm mới wikilink catalog từ tab Thiết lập."""
+        mwh.refresh_wikilink_catalog(self)
+
+    def _cleanup_unused_notes_from_settings(self) -> None:
+        """Dọn note không còn dùng từ tab Thiết lập."""
+        mwh.cleanup_unused_notes_with_preview(self)
+
+    def _audit_missing_source_note_files_from_settings(self) -> None:
+        """Quét source-note thiếu file markdown từ tab Thiết lập."""
+        mwh.audit_missing_source_note_files(self)
+
     def _open_search_dialog(self) -> None:
         """Mở dialog tìm kiếm toàn văn."""
         mwh.open_search_dialog(self)
@@ -243,6 +288,46 @@ class MainWindow(QMainWindow):
     def _open_export_dialog(self) -> None:
         """Xuất source bundle cho source đang mở (nếu có)."""
         mwh.open_export_dialog(self)
+
+    def _extract_text_from_workspace(self, source_id: int, page_no: int, pdf_rect: tuple) -> None:
+        """Trích văn bản từ vùng chọn trong Workspace."""
+        mwh.extract_text_from_workspace(self, source_id, page_no, pdf_rect)
+
+    def _extract_table_from_workspace(self, source_id: int, page_no: int, pdf_rect: tuple) -> None:
+        """Trích bảng từ vùng chọn trong Workspace."""
+        mwh.extract_table_from_workspace(self, source_id, page_no, pdf_rect)
+
+    def _capture_image_from_workspace(self, source_id: int, page_no: int, pdf_rect: tuple) -> None:
+        """Chụp ảnh từ vùng chọn trong Workspace."""
+        mwh.capture_image_from_workspace(self, source_id, page_no, pdf_rect)
+
+    def _update_last_opened_page_from_workspace(self, source_id: int, page_no: int) -> None:
+        """Lưu trang PDF đang mở từ Workspace."""
+        mwh.update_last_opened_page_from_workspace(self, source_id, page_no)
+
+    def _sync_board_with_source_notes(self) -> None:
+        """Đồng bộ board hiện tại theo source_note."""
+        mwh.sync_board_with_source_notes(self)
+
+    def _edit_board_cell(self, row_id: int, col_id: int) -> None:
+        """Sửa một ô trong board hiện tại."""
+        mwh.edit_board_cell(self, row_id, col_id)
+
+    def _export_board_markdown(self) -> None:
+        """Xuất board hiện tại ra Markdown."""
+        mwh.export_board_markdown(self)
+
+    def _export_board_csv(self) -> None:
+        """Xuất board hiện tại ra CSV."""
+        mwh.export_board_csv(self)
+
+    def _open_board_graph_view(self) -> None:
+        """Mở đồ thị liên kết của board."""
+        mwh.open_board_graph_view(self)
+
+    def _open_board_criteria_manager(self) -> None:
+        """Mở dialog tùy chỉnh tiêu chí board."""
+        mwh.open_board_criteria_manager(self)
 
     def _on_note_catalog_changed(self) -> None:
         """Khi catalog note thay đổi từ Settings: refresh các view liên quan."""

@@ -1,4 +1,4 @@
-"""Dialog quản lý [[wikilinks]] của một note.
+"""Dialog quản lý wikilink của một note.
 
 Hiển thị danh sách outgoing wikilinks (các note mà note này đang trỏ tới).
 Người dùng có thể xóa wikilink (xóa Link record) — không xóa note đích.
@@ -47,7 +47,7 @@ class NoteWikilinksDialog(QDialog):
             except AttributeError:
                 self._notes_dir = None
 
-        self.setWindowTitle("Quản lý liên kết (Wikilinks)")
+        self.setWindowTitle("Quản lý wikilink")
         self.setMinimumWidth(420)
         self._build_ui()
         self._load_links()
@@ -61,7 +61,7 @@ class NoteWikilinksDialog(QDialog):
         layout.setContentsMargins(16, 16, 16, 12)
         layout.setSpacing(10)
 
-        layout.addWidget(QLabel("Wikilinks đi ra từ ghi chú này:"))
+        layout.addWidget(QLabel("Wikilink đi ra từ ghi chú này:"))
 
         self._link_list = QListWidget()
         self._link_list.setMinimumHeight(180)

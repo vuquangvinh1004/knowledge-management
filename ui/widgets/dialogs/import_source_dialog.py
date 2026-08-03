@@ -91,7 +91,9 @@ class ImportSourceDialog(QDialog):
         self._edit_doi.setPlaceholderText("DOI (tùy chọn)")
         form.addRow("DOI:", self._edit_doi)
 
-        self._lbl_hint = QLabel("Import chỉ thêm tài liệu vào Thư viện nguồn. source_note sẽ tạo ở thẻ GC Nguồn.")
+        self._lbl_hint = QLabel(
+            "Import chỉ thêm tài liệu vào Thư viện nguồn. source note sẽ được tạo ở thẻ source note."
+        )
         self._lbl_hint.setWordWrap(True)
         self._lbl_hint.setObjectName("import_hint_label")
         form.addRow("", self._lbl_hint)

@@ -106,7 +106,7 @@ class SidebarWidget(QWidget):
             self._buttons.append(btn)
             layout.addWidget(btn)
 
-        self._project_header = QLabel("Project")
+        self._project_header = QLabel("Dự án")
         self._project_header.setObjectName("sidebar_section_header")
         self._project_header.setContentsMargins(10, 12, 10, 4)
         layout.addWidget(self._project_header)
@@ -122,7 +122,7 @@ class SidebarWidget(QWidget):
         pa_lay.setContentsMargins(8, 4, 8, 4)
         pa_lay.setSpacing(6)
 
-        self._btn_global_mode = QPushButton("Global")
+        self._btn_global_mode = QPushButton("Toàn cục")
         self._btn_global_mode.setObjectName("sidebar_project_global_btn")
         self._btn_global_mode.setFixedHeight(28)
         self._btn_global_mode.clicked.connect(lambda: self.project_activate_requested.emit(None))
@@ -166,7 +166,7 @@ class SidebarWidget(QWidget):
         return app_style.standardIcon(self._NAV_ICONS[index])
 
     def set_active(self, index: int) -> None:
-        """Dánh dấu mục đang active."""
+        """Đánh dấu mục đang active."""
         self._active_index = index
         for i, btn in enumerate(self._buttons):
             btn.setChecked(i == index)
@@ -240,7 +240,7 @@ class SidebarWidget(QWidget):
             self._project_list.addItem(item)
 
         if not projects:
-            item = QListWidgetItem("(Chưa có project)")
+            item = QListWidgetItem("(Chưa có dự án)")
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
             self._project_list.addItem(item)
 

@@ -16,7 +16,7 @@ class WorkspaceView(QWidget):
     Container cho DualPaneHost.
 
     Signals:
-        create_note_requested: Khi người dùng nhấn nút tạo source_note mới.
+        create_note_requested: Khi người dùng nhấn nút tạo source note mới.
         source_opened(int): Relay từ DualPaneHost.
     """
 
@@ -42,8 +42,8 @@ class WorkspaceView(QWidget):
 
         # Trang 0: empty state
         self._empty_state = EmptyStateWidget(
-            "Chưa có source_note nào được mở.\nBấm 'Tạo note mới' để chọn tài liệu từ Thư viện nguồn.",
-            action_label="Tạo note mới",
+            "Chưa có source note nào được mở.\nNhấn 'Tạo ghi chú mới' để chọn tài liệu từ thư viện nguồn.",
+            action_label="Tạo ghi chú mới",
         )
         if self._empty_state.action_button is not None:
             self._empty_state.action_button.clicked.connect(self.create_note_requested.emit)
@@ -68,8 +68,8 @@ class WorkspaceView(QWidget):
             if source_id not in allowed_ids:
                 QMessageBox.information(
                     self,
-                    "Project mode",
-                    "Tài liệu này không thuộc phạm vi project đang kích hoạt.",
+                    "Phạm vi dự án",
+                    "Tài liệu này không thuộc phạm vi dự án đang kích hoạt.",
                 )
                 return
         self._dual_pane.open_source(source_id)

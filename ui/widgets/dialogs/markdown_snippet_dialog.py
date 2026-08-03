@@ -1,4 +1,4 @@
-"""Dialogs cấu hình snippet Markdown cho nút Chèn... trong workspace."""
+"""Dialogs cấu hình mẫu Markdown cho nút Chèn... trong workspace."""
 from __future__ import annotations
 
 import re
@@ -25,7 +25,7 @@ from core.services.markdown_snippet_service import MarkdownSnippet, MarkdownSnip
 
 
 class MarkdownSnippetEditDialog(QDialog):
-    """Dialog tạo mới hoặc chỉnh sửa một snippet Markdown."""
+    """Dialog tạo mới hoặc chỉnh sửa một mẫu Markdown."""
 
     def __init__(self, snippet: MarkdownSnippet | None = None, parent=None) -> None:
         super().__init__(parent)
@@ -92,7 +92,7 @@ class MarkdownSnippetEditDialog(QDialog):
 
 
 class MarkdownSnippetCustomizeDialog(QDialog):
-    """Dialog quản lý danh sách đối tượng hiển thị trong menu Chèn...."""
+    """Dialog quản lý danh sách mẫu hiển thị trong menu Chèn...."""
 
     _ROLE_SNIPPET_ID = Qt.ItemDataRole.UserRole
 

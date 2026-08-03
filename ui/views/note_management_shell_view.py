@@ -1,4 +1,4 @@
-"""Container Quản lý ghi chú mới với các sub-tab theo workflow."""
+"""Container quản lý ghi chú với các tab con theo workflow."""
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
@@ -10,13 +10,13 @@ from ui.widgets.note_list_editor_tab import NoteListEditorTab
 
 
 class NoteScopeTabBar(QTabBar):
-    """Tab bar tô màu cố định theo scope note để dễ nhận diện."""
+    """Tab bar tô màu cố định theo phạm vi ghi chú để dễ nhận diện."""
 
     _TAB_COLORS = (
-        QColor("#C62828"),  # GC Nguồn
-        QColor("#2E7D32"),  # GC Khái niệm
-        QColor("#1565C0"),  # GC Tổng hợp
-        QColor("#7E57C2"),  # GC Board
+        QColor("#C62828"),  # source note
+        QColor("#2E7D32"),  # concept note
+        QColor("#1565C0"),  # synthesis note
+        QColor("#7E57C2"),  # board note
     )
 
     def paintEvent(self, _event) -> None:  # noqa: N802
@@ -37,7 +37,7 @@ class NoteScopeTabBar(QTabBar):
 
 
 class NoteManagementShellView(QWidget):
-    """Quản lý ghi chú với các sub-tab GC/GH theo loại note."""
+    """Quản lý ghi chú với các tab con theo từng loại ghi chú."""
 
     note_open_requested = Signal(int)
     note_deleted = Signal()
@@ -72,10 +72,10 @@ class NoteManagementShellView(QWidget):
         self._synthesis_tab = NoteListEditorTab("synthesis_note")
         self._board_tab = NoteListEditorTab("board_note")
 
-        self._tabs.addTab(self._source_workspace, "GC Nguồn")
-        self._tabs.addTab(self._concept_tab, "GC Khái niệm")
-        self._tabs.addTab(self._synthesis_tab, "GC Tổng hợp")
-        self._tabs.addTab(self._board_tab, "GC Board")
+        self._tabs.addTab(self._source_workspace, "source note")
+        self._tabs.addTab(self._concept_tab, "concept note")
+        self._tabs.addTab(self._synthesis_tab, "synthesis note")
+        self._tabs.addTab(self._board_tab, "board note")
 
         self._source_workspace.create_note_requested.connect(self.create_note_requested.emit)
         self._concept_tab.note_deleted.connect(self.note_deleted)
@@ -88,7 +88,7 @@ class NoteManagementShellView(QWidget):
         layout.addWidget(self._tabs, stretch=1)
 
     def open_source(self, source_id: int) -> None:
-        """Mở source trong tab GC Nguồn."""
+        """Mở source trong tab source note."""
         self._tabs.setCurrentIndex(0)
         self._source_workspace.open_source(source_id)
 

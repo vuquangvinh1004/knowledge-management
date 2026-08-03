@@ -54,7 +54,7 @@ class NoteListEditorTab(QWidget):
 
         self._combo_scope = QComboBox()
         self._combo_scope.addItem("Tất cả phạm vi", "all")
-        self._combo_scope.addItem("Global", "global")
+        self._combo_scope.addItem("Toàn cục", "global")
         self._combo_scope.addItem("Project", "project")
         self._combo_scope.currentIndexChanged.connect(lambda _idx: self._apply_filter())
         top_row.addWidget(self._combo_scope)
@@ -63,12 +63,12 @@ class NoteListEditorTab(QWidget):
         self._chk_include_deleted.toggled.connect(self._refresh_from_db)
         top_row.addWidget(self._chk_include_deleted)
 
-        self._btn_delete = QPushButton("Xóa note")
+        self._btn_delete = QPushButton("Xóa ghi chú")
         self._btn_delete.setEnabled(False)
         self._btn_delete.clicked.connect(self._delete_selected_note)
         top_row.addWidget(self._btn_delete)
 
-        self._btn_hard_delete = QPushButton("Xóa cứng")
+        self._btn_hard_delete = QPushButton("Xóa vĩnh viễn")
         self._btn_hard_delete.setEnabled(False)
         self._btn_hard_delete.clicked.connect(self._hard_delete_selected_note)
         top_row.addWidget(self._btn_hard_delete)
@@ -175,7 +175,7 @@ class NoteListEditorTab(QWidget):
                 self._doc_tabs.setTabTextColor(idx, QColor("#FFF59D"))
             self._tab_note_ids.append(int(note.id))
 
-        create_idx = self._doc_tabs.addTab("Tạo note mới")
+        create_idx = self._doc_tabs.addTab("Tạo ghi chú mới")
         self._doc_tabs.setTabToolTip(create_idx, "Tạo ghi chú mới")
         self._tab_note_ids.append(None)
         self._suppress_tab_changed = False
@@ -226,7 +226,7 @@ class NoteListEditorTab(QWidget):
         self._load_note_for_index(idx)
 
     def _on_tab_clicked(self, idx: int) -> None:
-        """Xử lý click lặp lại trên tab Tạo note mới khi tab này đang được chọn."""
+        """Xử lý click lặp lại trên tab Tạo ghi chú mới khi tab này đang được chọn."""
         if self._suppress_tab_changed:
             return
         if idx < 0 or idx >= len(self._tab_note_ids):
@@ -307,7 +307,7 @@ class NoteListEditorTab(QWidget):
             QMessageBox.critical(self, "Lỗi", f"Không thể sửa tên ghi chú:\n{exc}")
 
     def _quick_create_note(self) -> int | None:
-        """Tạo note mới trực tiếp, template hiển thị ở editor thay vì popup template."""
+        """Tạo ghi chú mới trực tiếp, template hiển thị ở editor thay vì popup template."""
         if self._note_type == "concept_note":
             default_title = "Khái niệm mới"
             prompt = "Nhập tiêu đề ghi chú khái niệm:"
@@ -318,7 +318,7 @@ class NoteListEditorTab(QWidget):
             default_title = "Ghi chú mới"
             prompt = "Nhập tiêu đề ghi chú:"
 
-        title_text, ok = QInputDialog.getText(self, "Tạo note mới", prompt, text=default_title)
+        title_text, ok = QInputDialog.getText(self, "Tạo ghi chú mới", prompt, text=default_title)
         if not ok:
             return None
         title = title_text.strip() or default_title
@@ -332,7 +332,7 @@ class NoteListEditorTab(QWidget):
                 save_to_project=save_to_project,
             )
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Lỗi", f"Không thể tạo note mới:\n{exc}")
+            QMessageBox.critical(self, "Lỗi", f"Không thể tạo ghi chú mới:\n{exc}")
             return None
 
         self.refresh()
@@ -376,7 +376,7 @@ class NoteListEditorTab(QWidget):
         try:
             self._editor.load_note(int(note_id), NOTES_DIR)
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Lỗi", f"Không thể mở note:\n{exc}")
+            QMessageBox.critical(self, "Lỗi", f"Không thể mở ghi chú:\n{exc}")
 
     def _delete_selected_note(self) -> None:
         note_id = self._current_tab_note_id()
@@ -402,7 +402,7 @@ class NoteListEditorTab(QWidget):
                 f"Asset refs: {impact.get('asset_refs')}\n"
                 f"Board cell refs: {impact.get('board_cell_refs')}\n"
                 f"Project refs: {impact.get('project_refs')}\n\n"
-                "Xác nhận xóa mềm note này?"
+                "Xác nhận xóa mềm ghi chú này?"
             ),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
@@ -414,7 +414,7 @@ class NoteListEditorTab(QWidget):
             self.refresh()
             self.note_deleted.emit()
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Lỗi", f"Không thể xóa note:\n{exc}")
+            QMessageBox.critical(self, "Lỗi", f"Không thể xóa ghi chú:\n{exc}")
 
     def _hard_delete_selected_note(self) -> None:
         note_id = self._current_tab_note_id()
@@ -452,7 +452,7 @@ class NoteListEditorTab(QWidget):
         second_confirm = QMessageBox.question(
             self,
             "Xác nhận lần 2",
-            "Bạn chắc chắn muốn xóa cứng note này ngay bây giờ?",
+                "Bạn chắc chắn muốn xóa vĩnh viễn ghi chú này ngay bây giờ?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if second_confirm != QMessageBox.StandardButton.Yes:
@@ -463,4 +463,4 @@ class NoteListEditorTab(QWidget):
             self.refresh()
             self.note_deleted.emit()
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Lỗi", f"Không thể xóa cứng note:\n{exc}")
+            QMessageBox.critical(self, "Lỗi", f"Không thể xóa vĩnh viễn ghi chú:\n{exc}")

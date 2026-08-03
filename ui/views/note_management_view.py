@@ -21,10 +21,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from config.paths import ASSETS_DIR, NOTES_DIR
+from config.paths import NOTES_DIR
 from core.services.note_service import NoteService
-from core.services.project_service import ProjectService
-from core.services.workspace_orchestrator import WorkspaceOrchestrator
+from ui.handlers import main_window_handlers as mwh
 
 
 class NoteManagementView(QWidget):
@@ -57,17 +56,17 @@ class NoteManagementView(QWidget):
 
         self._combo_type = QComboBox()
         self._combo_type.addItem("Tất cả loại", "all")
-        self._combo_type.addItem("source_note", "source_note")
-        self._combo_type.addItem("concept_note", "concept_note")
-        self._combo_type.addItem("synthesis_note", "synthesis_note")
-        self._combo_type.addItem("board_note", "board_note")
+        self._combo_type.addItem("source note", "source_note")
+        self._combo_type.addItem("concept note", "concept_note")
+        self._combo_type.addItem("synthesis note", "synthesis_note")
+        self._combo_type.addItem("board note", "board_note")
         self._combo_type.currentIndexChanged.connect(lambda _idx: self._apply_filter())
         top_row.addWidget(self._combo_type)
 
         self._combo_scope = QComboBox()
         self._combo_scope.addItem("Tất cả phạm vi", "all")
-        self._combo_scope.addItem("Global", "global")
-        self._combo_scope.addItem("Project", "project")
+        self._combo_scope.addItem("Toàn cục", "global")
+        self._combo_scope.addItem("Dự án", "project")
         self._combo_scope.currentIndexChanged.connect(lambda _idx: self._apply_filter())
         top_row.addWidget(self._combo_scope)
 
@@ -75,7 +74,7 @@ class NoteManagementView(QWidget):
         self._chk_include_deleted.toggled.connect(self._refresh_from_db)
         top_row.addWidget(self._chk_include_deleted)
 
-        self._btn_create = QPushButton("Tạo note mới")
+        self._btn_create = QPushButton("Tạo ghi chú mới")
         self._btn_create.clicked.connect(self._create_note)
         top_row.addWidget(self._btn_create)
 
@@ -84,12 +83,12 @@ class NoteManagementView(QWidget):
         self._btn_preview.clicked.connect(self._show_preview_dialog)
         top_row.addWidget(self._btn_preview)
 
-        self._btn_edit = QPushButton("Chỉnh sửa note")
+        self._btn_edit = QPushButton("Chỉnh sửa ghi chú")
         self._btn_edit.setEnabled(False)
         self._btn_edit.clicked.connect(self._edit_selected_note)
         top_row.addWidget(self._btn_edit)
 
-        self._btn_delete = QPushButton("Xóa note")
+        self._btn_delete = QPushButton("Xóa ghi chú")
         self._btn_delete.setEnabled(False)
         self._btn_delete.clicked.connect(self._delete_selected_note)
         top_row.addWidget(self._btn_delete)
@@ -106,7 +105,7 @@ class NoteManagementView(QWidget):
         self._list.itemDoubleClicked.connect(lambda _item: self._edit_selected_note())
         layout.addWidget(self._list, stretch=1)
 
-        self._lbl_detail = QLabel("Chọn một note để xem thông tin.")
+        self._lbl_detail = QLabel("Chọn một ghi chú để xem thông tin.")
         self._lbl_detail.setWordWrap(True)
         self._lbl_detail.setObjectName("empty_state_message")
         layout.addWidget(self._lbl_detail)
@@ -114,7 +113,7 @@ class NoteManagementView(QWidget):
         self._preview = QTextEdit()
         self._preview.setObjectName("note_preview")
         self._preview.setReadOnly(True)
-        self._preview.setPlaceholderText("Xem trước nội dung note sẽ hiển thị ở đây.")
+        self._preview.setPlaceholderText("Xem trước nội dung ghi chú sẽ hiển thị ở đây.")
         self._preview.setMinimumHeight(200)
         self._preview.setAcceptRichText(False)
         self._preview.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
@@ -140,11 +139,11 @@ class NoteManagementView(QWidget):
         layout.addWidget(self._preview)
 
     def set_project_context(self, project_id: int | None) -> None:
-        """Nhận project mode hiện tại để default scope khi tạo note."""
+        """Nhận chế độ dự án hiện tại để dùng làm phạm vi mặc định khi tạo ghi chú."""
         self._project_id = project_id
 
     def refresh(self) -> None:
-        """Tải lại danh sách note từ DB."""
+        """Tải lại danh sách ghi chú từ cơ sở dữ liệu."""
         self._refresh_from_db()
 
     def _refresh_from_db(self) -> None:
@@ -181,10 +180,15 @@ class NoteManagementView(QWidget):
         for row in filtered:
             title = row.get("title") or "(không tiêu đề)"
             note_type = row.get("note_type") or "note"
-            scope = row.get("scope_label") or "Global"
+            scope = row.get("scope_label") or "Toàn cục"
+            if scope == "Global":
+                scope = "Toàn cục"
+            elif isinstance(scope, str) and scope.startswith("Project"):
+                scope = scope.replace("Project", "Dự án", 1)
             note_id = row.get("note_id")
             deleted_marker = " [ĐÃ XÓA]" if int(row.get("is_deleted") or 0) == 1 else ""
-            item = QListWidgetItem(f"[{note_type}] {title}  |  {scope}{deleted_marker}")
+            display_type = note_type.replace("_", " ")
+            item = QListWidgetItem(f"[{display_type}] {title}  |  {scope}{deleted_marker}")
             item.setData(Qt.ItemDataRole.UserRole, note_id)
             self._list.addItem(item)
 
@@ -215,17 +219,21 @@ class NoteManagementView(QWidget):
         self._btn_hard_delete.setEnabled(note_id is not None)
 
         if note_id is None:
-            self._lbl_detail.setText("Chọn một note để xem thông tin.")
+            self._lbl_detail.setText("Chọn một ghi chú để xem thông tin.")
             self._preview.clear()
             return
 
         row = next((r for r in self._rows if int(r.get("note_id", -1)) == note_id), None)
         if row is None:
-            self._lbl_detail.setText("Không đọc được thông tin note đã chọn.")
+            self._lbl_detail.setText("Không đọc được thông tin ghi chú đã chọn.")
             self._preview.clear()
             return
 
-        source_text = f"source_id={row.get('source_id')}" if row.get("source_id") is not None else "không gắn source"
+        source_text = (
+            f"source note ID={row.get('source_id')}"
+            if row.get("source_id") is not None
+            else "không gắn source note"
+        )
         self._lbl_detail.setText(
             f"ID: {row.get('note_id')} | Loại: {row.get('note_type')} | "
             f"Phạm vi: {row.get('scope_label')} | {source_text}"
@@ -234,12 +242,12 @@ class NoteManagementView(QWidget):
 
     def _load_preview(self, note_id: int, is_deleted: bool) -> None:
         if is_deleted:
-            self._preview.setMarkdown("**Note đã soft-delete.** Chỉ có thể xem metadata hoặc xóa cứng.")
+            self._preview.setMarkdown("**Ghi chú đã bị xóa tạm.** Chỉ có thể xem metadata hoặc xóa cứng.")
             return
         try:
             content = NoteService(NOTES_DIR).read_content(note_id)
         except Exception as exc:  # noqa: BLE001
-            self._preview.setMarkdown(f"**Không thể tải preview nội dung note:** {exc}")
+            self._preview.setMarkdown(f"**Không thể tải xem trước nội dung ghi chú:** {exc}")
             return
 
         trimmed = content.strip()
@@ -251,188 +259,23 @@ class NoteManagementView(QWidget):
         note_id = self._selected_note_id()
         if note_id is None:
             return
-        QMessageBox.information(
-            self,
-            "Xem trước note",
-            "Bạn có thể xem trước đầy đủ ở khung preview bên dưới danh sách trước khi chọn Chỉnh sửa.",
-        )
+        mwh.show_note_management_preview(self, note_id)
 
     def _create_note(self) -> None:
-        """Tạo note mới bằng NewNoteDialog."""
-        from ui.widgets.dialogs.new_note_dialog import NewNoteDialog
-
-        active_project_id = self._project_id
-        active_project_name = None
-        if active_project_id is not None:
-            try:
-                active_project_name = ProjectService().get_project(active_project_id).name
-            except Exception:
-                active_project_name = None
-
-        dlg = NewNoteDialog(
-            self,
-            notes_dir=NOTES_DIR,
-            current_note_title="",
-            active_project_id=active_project_id,
-            active_project_name=active_project_name,
-        )
-        if dlg.exec() != dlg.DialogCode.Accepted:
-            return
-
-        try:
-            note = WorkspaceOrchestrator(NOTES_DIR, ASSETS_DIR).create_note_in_scope(
-                title=dlg.title_text,
-                note_type=dlg.note_type,
-                initial_content=dlg.content_text,
-                save_to_project=(dlg.save_scope == "project"),
-            )
-            self.refresh()
-            self.note_created.emit(int(note.id))
-            QMessageBox.information(self, "Tạo note", f"Đã tạo note mới: {note.title}")
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Lỗi", f"Không thể tạo note mới:\n{exc}")
+        """Tạo ghi chú mới bằng NewNoteDialog."""
+        mwh.create_note_from_management_view(self)
 
     def _edit_selected_note(self) -> None:
         """Chuyển sang màn hình chỉnh sửa note đã chọn."""
-        note_id = self._selected_note_id()
-        if note_id is None:
-            QMessageBox.information(self, "Chỉnh sửa note", "Vui lòng chọn một note trước.")
-            return
-
-        row = next((r for r in self._rows if int(r.get("note_id", -1)) == note_id), None)
-        if row is not None and int(row.get("is_deleted") or 0) == 1:
-            QMessageBox.warning(
-                self,
-                "Chỉnh sửa note",
-                "Note này đang ở trạng thái đã xóa mềm, không thể mở chỉnh sửa."
-                "\nBạn có thể xóa cứng để dọn hẳn hoặc bỏ lọc 'Bao gồm đã xóa'.",
-            )
-            return
-
-        reply = QMessageBox.question(
-            self,
-            "Mở chỉnh sửa note",
-            (
-                "Bạn sắp mở note để chỉnh sửa nội dung.\n"
-                "Lưu ý: thay đổi có thể ảnh hưởng wikilink, backlinks, tags và kết quả tìm kiếm.\n\n"
-                "Tiếp tục?"
-            ),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-
-        self.note_open_requested.emit(note_id)
+        mwh.edit_note_from_management_view(self)
 
     def _delete_selected_note(self) -> None:
         """Xóa mềm note với cảnh báo ảnh hưởng."""
-        note_id = self._selected_note_id()
-        if note_id is None:
-            QMessageBox.information(self, "Xóa note", "Vui lòng chọn một note trước.")
-            return
-
-        svc = NoteService(NOTES_DIR)
-        try:
-            impact = svc.get_note_delete_impact(note_id)
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Lỗi", f"Không thể phân tích ảnh hưởng:\n{exc}")
-            return
-
-        extra = ""
-        if impact.get("is_source_note"):
-            extra = (
-                "\n\nLưu ý source_note:\n"
-                "- Note này đang gắn với một source PDF.\n"
-                "- Khi mở lại source, ứng dụng sẽ tự tạo source_note mới nếu cần."
-            )
-
-        reply = QMessageBox.warning(
-            self,
-            "Xác nhận xóa note",
-            (
-                f"Bạn sắp xóa note: {impact.get('title') or '(không tiêu đề)'}\n"
-                f"Loại: {impact.get('note_type')}\n"
-                f"Incoming links: {impact.get('incoming_links')}\n"
-                f"Outgoing links: {impact.get('outgoing_links')}\n"
-                f"Extract refs: {impact.get('extract_refs')}\n"
-                f"Asset refs: {impact.get('asset_refs')}\n"
-                f"Board cell refs: {impact.get('board_cell_refs')}\n"
-                f"Linked boards: {impact.get('linked_boards')}\n"
-                f"Project refs: {impact.get('project_refs')}"
-                f"{extra}\n\n"
-                "Xác nhận xóa mềm note này?"
-            ),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-
-        try:
-            stats = svc.cleanup_unused_notes({note_id})
-            self.refresh()
-            self.note_deleted.emit()
-            QMessageBox.information(
-                self,
-                "Đã xóa note",
-                (
-                    "Đã áp dụng xóa mềm note.\n"
-                    f"Stale links đã dọn: {stats.get('removed_stale_links', 0)}"
-                ),
-            )
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Lỗi", f"Không thể xóa note:\n{exc}")
+        mwh.delete_note_from_management_view(self)
 
     def _hard_delete_selected_note(self) -> None:
-        """Xóa cứng note và file markdown (không thể hoàn tác)."""
-        note_id = self._selected_note_id()
-        if note_id is None:
-            QMessageBox.information(self, "Xóa cứng", "Vui lòng chọn một note trước.")
-            return
-
-        svc = NoteService(NOTES_DIR)
-        try:
-            impact = svc.get_note_delete_impact(note_id)
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Lỗi", f"Không thể phân tích ảnh hưởng:\n{exc}")
-            return
-
-        first_confirm = QMessageBox.warning(
-            self,
-            "CẢNH BÁO XÓA CỨNG",
-            (
-                "Bạn đang chọn XÓA CỨNG note.\n"
-                "- Record note sẽ bị xóa khỏi DB.\n"
-                "- File markdown sẽ bị xóa khỏi ổ đĩa.\n"
-                "- Không thể hoàn tác.\n\n"
-                f"Note: {impact.get('title') or '(không tiêu đề)'}\n"
-                f"Incoming links: {impact.get('incoming_links')}\n"
-                f"Outgoing links: {impact.get('outgoing_links')}\n"
-                f"Extract refs: {impact.get('extract_refs')}\n"
-                f"Asset refs: {impact.get('asset_refs')}\n"
-                f"Board refs: {impact.get('board_cell_refs')} cells / {impact.get('linked_boards')} boards\n\n"
-                "Tiếp tục xóa cứng?"
-            ),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if first_confirm != QMessageBox.StandardButton.Yes:
-            return
-
-        second_confirm = QMessageBox.question(
-            self,
-            "Xác nhận lần 2",
-            "Bạn chắc chắn muốn xóa cứng note này ngay bây giờ?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if second_confirm != QMessageBox.StandardButton.Yes:
-            return
-
-        try:
-            svc.hard_delete(note_id, delete_file=True)
-            self.refresh()
-            self.note_deleted.emit()
-            QMessageBox.information(self, "Xóa cứng", "Đã xóa cứng note thành công.")
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Lỗi", f"Không thể xóa cứng note:\n{exc}")
+        """Xóa cứng note và file Markdown (không thể hoàn tác)."""
+        mwh.hard_delete_note_from_management_view(self)
 
     def showEvent(self, event) -> None:  # noqa: N802
         super().showEvent(event)

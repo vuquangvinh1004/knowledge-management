@@ -321,27 +321,27 @@ class MarkdownEditorWidget(QWidget):
         self._lbl_save_status.setObjectName("editor_save_status")
         self._lbl_save_status.setAlignment(Qt.AlignmentFlag.AlignRight)
 
-        self._btn_tags = QPushButton("Tags")
+        self._btn_tags = QPushButton("Nhãn")
         self._btn_tags.setObjectName("editor_tags_btn")
         self._btn_tags.setToolTip("Quản lý nhãn của ghi chú này")
         self._btn_tags.setEnabled(False)
         self._btn_tags.clicked.connect(self._open_tags_dialog)
 
-        self._btn_wikilinks = QPushButton("Wikilinks")
+        self._btn_wikilinks = QPushButton("Liên kết")
         self._btn_wikilinks.setObjectName("editor_wikilinks_btn")
-        self._btn_wikilinks.setToolTip("nguyên lý các [[wikilink]] của ghi chú này")
+        self._btn_wikilinks.setToolTip("Quản lý các [[wikilink]] của ghi chú này")
         self._btn_wikilinks.setEnabled(False)
         self._btn_wikilinks.clicked.connect(self._open_wikilinks_dialog)
 
-        self._btn_new_note = QPushButton("Note mới")
+        self._btn_new_note = QPushButton("Ghi chú mới")
         self._btn_new_note.setObjectName("editor_new_note_btn")
-        self._btn_new_note.setToolTip("Tạo concept/synthesis/board note")
+        self._btn_new_note.setToolTip("Tạo concept note / synthesis note / board note")
         self._btn_new_note.setEnabled(False)
         self._btn_new_note.clicked.connect(self._open_new_note_dialog)
 
         self._btn_meta = QPushButton("Metadata")
         self._btn_meta.setObjectName("editor_meta_btn")
-        self._btn_meta.setToolTip("Chỉnh metadata theo loại note")
+        self._btn_meta.setToolTip("Chỉnh metadata theo loại ghi chú")
         self._btn_meta.setEnabled(False)
         self._btn_meta.clicked.connect(self._open_metadata_dialog)
 
@@ -370,8 +370,8 @@ class MarkdownEditorWidget(QWidget):
         self._apply_editor_font()
         self._editor.setPlaceholderText(
             "Ghi chú Markdown của bạn ở đây...\n\n"
-            "Hỗ trợ [[wikilink]], # heading, #hashtag, > blockquote, | bảng |\n"
-            "Quy ước: heading dùng '# ' (có khoảng trắng), hashtag dùng '#tag'."
+            "Hỗ trợ [[wikilink]], # tiêu đề, #hashtag, > trích dẫn, | bảng |\n"
+            "Quy ước: tiêu đề dùng '# ' (có khoảng trắng), hashtag dùng '#tag'."
         )
         self._editor.textChanged.connect(self._on_text_changed)
         layout.addWidget(self._editor)
@@ -814,7 +814,11 @@ class MarkdownEditorWidget(QWidget):
         if not self._show_note_actions:
             return
         if self._notes_dir is None or self._note_id is None:
-            QMessageBox.information(self, "Tạo note", "Vui lòng mở một note trước khi tạo note mới.")
+            QMessageBox.information(
+                self,
+                "Tạo ghi chú",
+                "Vui lòng mở một ghi chú trước khi tạo ghi chú mới.",
+            )
             return
 
         from core.services.project_service import ProjectService
@@ -846,16 +850,16 @@ class MarkdownEditorWidget(QWidget):
                 save_to_project=(dlg.save_scope == "project"),
             )
             self._insert_at_cursor(f"[[{note.title}]]\n")
-            scope_text = "Project" if dlg.save_scope == "project" else "Global"
+            scope_text = "Dự án" if dlg.save_scope == "project" else "Toàn cục"
             QMessageBox.information(
                 self,
-                "Tạo note thành công",
-                f"Đã tạo note: {note.title}\nPhạm vi lưu: {scope_text}\nĐã chèn wikilink vào note hiện tại.",
+                "Tạo ghi chú thành công",
+                f"Đã tạo ghi chú: {note.title}\nPhạm vi lưu: {scope_text}\nĐã chèn wikilink vào ghi chú hiện tại.",
             )
             self._refresh_known_wikilinks()
             self._refresh_quality_warning()
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Lỗi", f"Không thể tạo note mới:\n{exc}")
+            QMessageBox.critical(self, "Lỗi", f"Không thể tạo ghi chú mới:\n{exc}")
 
     def _open_metadata_dialog(self) -> None:
         """Mở dialog chỉnh metadata của note hiện tại."""

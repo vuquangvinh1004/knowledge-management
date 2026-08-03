@@ -1,0 +1,14 @@
+{
+  "window_width": 1280,
+  "window_height": 800,
+  "window_maximized": false,
+  "sidebar_width": 220,
+  "sidebar_collapsed": true,
+  "dual_pane_split": 0.5,
+  "theme": "light",
+  "last_opened_sources": [],
+  "autosave_interval_seconds": 30,
+  "editor.fontFamily": "Cascadia Code, Consolas, Courier New, monospace",
+  "editor.fontLigatures": true,
+  "editor.fontSize": 12
+}

@@ -18,24 +18,25 @@
 
 AI Agent và người phát triển phải đọc theo thứ tự sau trước khi code:
 
-1. `START_HERE_FOR_AI_AGENT.md`
-2. `PKM_ARCHITECTURE.md`
-3. `PKM_ROADMAP.md`
-4. `PKM_SPEC_FINAL.md`
+1. [`START_HERE_FOR_AI_AGENT.md`](docs/onboarding/START_HERE_FOR_AI_AGENT.md)
+2. [`PKM_ARCHITECTURE.md`](docs/architecture/PKM_ARCHITECTURE.md)
+3. [`PKM_ROADMAP.md`](docs/roadmap/PKM_ROADMAP.md)
+4. [`PKM_SPEC_FINAL.md`](docs/spec/PKM_SPEC_FINAL.md)
 
 Nếu cần bản rút gọn để khởi động nhanh, đọc thêm:
 
-- `REQUIREMENTS.md`
-- `PKM_README_PROJECT_STARTER.md`
+- [`REQUIREMENTS.md`](docs/onboarding/REQUIREMENTS.md)
+- [`PKM_README_PROJECT_STARTER.md`](docs/onboarding/PKM_README_PROJECT_STARTER.md)
 
 ## Cấu trúc tài liệu
 
-- `PKM_ARCHITECTURE.md`: nguồn chân lý kiến trúc
-- `PKM_ROADMAP.md`: tiến độ và phase thực hiện
-- `PKM_SPEC_FINAL.md`: đặc tả tổng hợp sản phẩm
-- `START_HERE_FOR_AI_AGENT.md`: file mở đầu cho mọi phiên code
-- `REQUIREMENTS.md`: bản brief ngắn cho AI Agent
-- `docs/`: tài liệu bổ sung về schema, extraction, export, testing, coding standards, release
+- [`PKM_ARCHITECTURE.md`](docs/architecture/PKM_ARCHITECTURE.md): nguồn chân lý kiến trúc
+- [`PKM_ROADMAP.md`](docs/roadmap/PKM_ROADMAP.md): tiến độ và phase thực hiện
+- [`PKM_SPEC_FINAL.md`](docs/spec/PKM_SPEC_FINAL.md): đặc tả tổng hợp sản phẩm
+- [`START_HERE_FOR_AI_AGENT.md`](docs/onboarding/START_HERE_FOR_AI_AGENT.md): file mở đầu cho mọi phiên code
+- [`REQUIREMENTS.md`](docs/onboarding/REQUIREMENTS.md): bản brief ngắn cho AI Agent
+- [`docs/README.md`](docs/README.md): bản đồ điều hướng toàn bộ hệ tài liệu
+- [`docs/`](docs): tài liệu bổ sung về schema, extraction, export, testing, coding standards, release
 
 ## Tech stack chính thức
 
@@ -61,7 +62,7 @@ Phiên bản hiện tại đã có:
 - metadata cho note và các luồng quản trị note nâng cao
 - test coverage rộng với **375/375 tests pass**
 
-Chi tiết tiến độ và sprint xem trong `PKM_ROADMAP.md`.
+Chi tiết tiến độ và sprint xem trong [`PKM_ROADMAP.md`](docs/roadmap/PKM_ROADMAP.md).
 
 ## Chạy ứng dụng
 
@@ -83,7 +84,7 @@ Repo đã có các file nền tảng để public:
 - `CONTRIBUTING.md`
 - `CODE_OF_CONDUCT.md`
 - `SECURITY.md`
-- `CHANGELOG.md`
+- [`CHANGELOG.md`](docs/release/CHANGELOG.md)
 - `.github/workflows/ci.yml`
 
 ## Giay phep
@@ -106,7 +107,7 @@ Du an su dung giay phep MIT. Xem chi tiet tai `LICENSE`.
 Dùng prompt sau:
 
 ```text
-Đọc START_HERE_FOR_AI_AGENT.md, PKM_ARCHITECTURE.md, PKM_ROADMAP.md và PKM_SPEC_FINAL.md trước khi code.
+Đọc [`START_HERE_FOR_AI_AGENT.md`](docs/onboarding/START_HERE_FOR_AI_AGENT.md), [`PKM_ARCHITECTURE.md`](docs/architecture/PKM_ARCHITECTURE.md), [`PKM_ROADMAP.md`](docs/roadmap/PKM_ROADMAP.md) và [`PKM_SPEC_FINAL.md`](docs/spec/PKM_SPEC_FINAL.md) trước khi code.
 Tuân thủ tuyệt đối tech stack, kiến trúc phân lớp, data semantics, extraction rules, export contracts, roadmap phase, acceptance criteria và checklist sau mỗi task.
 Không tự ý thay đổi schema, stack, storage layout, note format hoặc source anchor format nếu chưa cập nhật tài liệu tương ứng.
 ```

@@ -14,7 +14,6 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QMessageBox,
     QPushButton,
     QSpinBox,
     QVBoxLayout,
@@ -38,6 +37,13 @@ _MODE_BADGE_BASE = (
 class SettingsView(QWidget):
     """Màn hình thiết lập ứng dụng."""
 
+    backup_requested = Signal(int)
+    rebuild_fts_requested = Signal()
+    reset_settings_requested = Signal()
+    normalize_source_titles_requested = Signal()
+    refresh_wikilink_catalog_requested = Signal()
+    cleanup_unused_notes_requested = Signal()
+    audit_missing_source_note_files_requested = Signal()
     source_titles_normalized = Signal()
     wikilink_catalog_refreshed = Signal()
     editor_preferences_changed = Signal(str, bool, int)
@@ -69,55 +75,55 @@ class SettingsView(QWidget):
 
         row_backup = QHBoxLayout()
         self._btn_backup_now = QPushButton("Sao lưu ngay")
-        self._btn_backup_now.clicked.connect(self._do_backup)
+        self._btn_backup_now.clicked.connect(self._request_backup)
         row_backup.addWidget(self._btn_backup_now)
         row_backup.addStretch()
         form_backup.addRow("", row_backup)
         layout.addWidget(grp_backup)
 
-        # --- Nhóm: Search ---
-        grp_search = QGroupBox("Tìm kiếm")
+        # --- Nhóm: Bảo trì & tìm kiếm ---
+        grp_search = QGroupBox("Bảo trì & tìm kiếm")
         form_search = QFormLayout(grp_search)
 
         row_fts = QHBoxLayout()
-        self._btn_rebuild_fts = QPushButton("Rebuild FTS Index")
+        self._btn_rebuild_fts = QPushButton("Xây dựng lại chỉ mục tìm kiếm")
         self._btn_rebuild_fts.setToolTip(
-            "Xây dựng lại toàn bộ chỉ mục tìm kiếm từ database"
+            "Xây dựng lại toàn bộ chỉ mục tìm kiếm từ cơ sở dữ liệu"
         )
-        self._btn_rebuild_fts.clicked.connect(self._rebuild_fts)
+        self._btn_rebuild_fts.clicked.connect(self._request_rebuild_fts)
         row_fts.addWidget(self._btn_rebuild_fts)
         self._lbl_fts_status = QLabel("")
         row_fts.addWidget(self._lbl_fts_status)
         row_fts.addStretch()
-        form_search.addRow("Chỉ mục FTS5:", row_fts)
+        form_search.addRow("Chỉ mục tìm kiếm FTS5:", row_fts)
 
         row_maintenance = QHBoxLayout()
-        self._btn_normalize_source_titles = QPushButton("Chuẩn hóa tên Source-note")
+        self._btn_normalize_source_titles = QPushButton("Chuẩn hóa tên source note")
         self._btn_normalize_source_titles.setToolTip(
-            "Chạy lại tác vụ chuẩn hóa tên Source-note theo metadata hiện có (idempotent)"
+            "Chạy lại tác vụ chuẩn hóa tên source note theo metadata hiện có (không thay đổi khi chạy nhiều lần)"
         )
-        self._btn_normalize_source_titles.clicked.connect(self._normalize_source_note_titles)
+        self._btn_normalize_source_titles.clicked.connect(self._request_normalize_source_titles)
         row_maintenance.addWidget(self._btn_normalize_source_titles)
 
-        self._btn_refresh_wikilink_catalog = QPushButton("Làm mới danh sách Wikilink")
+        self._btn_refresh_wikilink_catalog = QPushButton("Làm mới danh sách wikilink")
         self._btn_refresh_wikilink_catalog.setToolTip(
-            "Làm mới catalog note cho popup [[wikilink]] và dọn bản ghi note/link stale"
+            "Làm mới danh sách note cho popup [[wikilink]] và dọn bản ghi note/liên kết cũ"
         )
-        self._btn_refresh_wikilink_catalog.clicked.connect(self._refresh_wikilink_catalog)
+        self._btn_refresh_wikilink_catalog.clicked.connect(self._request_refresh_wikilink_catalog)
         row_maintenance.addWidget(self._btn_refresh_wikilink_catalog)
 
-        self._btn_cleanup_unused_notes = QPushButton("Dọn ghi chú không còn dùng (có xem trước)")
+        self._btn_cleanup_unused_notes = QPushButton("Dọn ghi chú không còn dùng")
         self._btn_cleanup_unused_notes.setToolTip(
             "Xem trước danh sách ghi chú nghi ngờ không còn dùng, chọn giữ/xóa rồi mới áp dụng"
         )
-        self._btn_cleanup_unused_notes.clicked.connect(self._cleanup_unused_notes_with_preview)
+        self._btn_cleanup_unused_notes.clicked.connect(self._request_cleanup_unused_notes)
         row_maintenance.addWidget(self._btn_cleanup_unused_notes)
 
-        self._btn_audit_source_notes = QPushButton("Kiểm tra source-note lỗi file (chỉ xem)")
+        self._btn_audit_source_notes = QPushButton("Kiểm tra source note thiếu file")
         self._btn_audit_source_notes.setToolTip(
-            "Quét read-only các source-note có record DB nhưng file markdown không tồn tại"
+            "Quét chỉ đọc các source note có bản ghi trong cơ sở dữ liệu nhưng file Markdown không tồn tại"
         )
-        self._btn_audit_source_notes.clicked.connect(self._audit_missing_source_note_files)
+        self._btn_audit_source_notes.clicked.connect(self._request_audit_missing_source_note_files)
         row_maintenance.addWidget(self._btn_audit_source_notes)
         row_maintenance.addStretch()
         form_search.addRow("Bảo trì ghi chú:", row_maintenance)
@@ -127,39 +133,39 @@ class SettingsView(QWidget):
         grp_editor = QGroupBox("Trình soạn thảo")
         form_editor = QFormLayout(grp_editor)
 
-        self._lbl_mode_info = QLabel("Mode: Global")
+        self._lbl_mode_info = QLabel("Chế độ: Toàn cục")
         self._lbl_mode_info.setObjectName("settings_mode_indicator")
         self._lbl_mode_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._lbl_mode_info.setMinimumWidth(160)
-        self._apply_mode_badge_style("Mode: Global")
-        form_editor.addRow("Mode hiện tại:", self._lbl_mode_info)
+        self._apply_mode_badge_style("Chế độ: Toàn cục")
+        form_editor.addRow("Chế độ hiện tại:", self._lbl_mode_info)
 
         self._combo_editor_font = QComboBox()
         self._combo_editor_font.setEditable(True)
         self._combo_editor_font.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self._combo_editor_font.setToolTip(
-            "Danh sách ưu tiên font monospace cho note, ví dụ: Cascadia Code, Consolas, Courier New, monospace"
+            "Danh sách ưu tiên phông chữ monospace cho ghi chú, ví dụ: Cascadia Code, Consolas, Courier New, monospace"
         )
         self._combo_editor_font.addItems(list(EDITOR_FONT_PRESETS) + [
             "Consolas, Cascadia Code, monospace",
             "Consolas, Aptos Mono, monospace",
         ])
         self._combo_editor_font.currentTextChanged.connect(self._on_editor_preferences_changed)
-        form_editor.addRow("Font editor:", self._combo_editor_font)
+        form_editor.addRow("Phông chữ:", self._combo_editor_font)
 
-        self._chk_editor_ligatures = QCheckBox("Bật ligature cho font editor")
+        self._chk_editor_ligatures = QCheckBox("Bật ký tự nối cho phông chữ")
         self._chk_editor_ligatures.toggled.connect(self._on_editor_preferences_changed)
-        form_editor.addRow("Ligatures:", self._chk_editor_ligatures)
+        form_editor.addRow("Ký tự nối:", self._chk_editor_ligatures)
 
         self._spin_editor_font_size = QSpinBox()
         self._spin_editor_font_size.setRange(10, 24)
         self._spin_editor_font_size.setValue(DEFAULT_EDITOR_FONT_SIZE)
         self._spin_editor_font_size.setSuffix(" pt")
         self._spin_editor_font_size.setToolTip(
-            "Điều chỉnh cỡ chữ vùng ghi chú và soạn thảo Markdown"
+            "Điều chỉnh cỡ chữ vùng ghi chú và trình soạn thảo Markdown"
         )
         self._spin_editor_font_size.valueChanged.connect(self._on_editor_preferences_changed)
-        form_editor.addRow("Cỡ chữ editor:", self._spin_editor_font_size)
+        form_editor.addRow("Cỡ chữ:", self._spin_editor_font_size)
 
         layout.addWidget(grp_editor)
 
@@ -172,7 +178,7 @@ class SettingsView(QWidget):
         form_info.addRow("Phiên bản:", QLabel(APP_VERSION))
 
         from config.paths import DATABASE_FILE, DATA_DIR
-        form_info.addRow("Database:", QLabel(str(DATABASE_FILE)))
+        form_info.addRow("Cơ sở dữ liệu:", QLabel(str(DATABASE_FILE)))
         form_info.addRow("Thư mục dữ liệu:", QLabel(str(DATA_DIR)))
         layout.addWidget(grp_info)
 
@@ -180,7 +186,7 @@ class SettingsView(QWidget):
         row_reset = QHBoxLayout()
         self._btn_reset = QPushButton("Khôi phục cài đặt mặc định")
         self._btn_reset.setToolTip("Đặt lại tất cả cài đặt về giá trị mặc định")
-        self._btn_reset.clicked.connect(self._reset_settings)
+        self._btn_reset.clicked.connect(self._request_reset_settings)
         row_reset.addStretch()
         row_reset.addWidget(self._btn_reset)
         layout.addLayout(row_reset)
@@ -233,6 +239,23 @@ class SettingsView(QWidget):
         except Exception as exc:
             logger.warning(f"Không thể lưu cài đặt editor font: {exc}")
 
+    def reload_settings(self) -> None:
+        """Tải lại settings từ storage vào form."""
+        self._load_settings()
+
+    def set_maintenance_buttons_enabled(self, enabled: bool) -> None:
+        """Bật/tắt nhóm nút bảo trì để đồng bộ trạng thái bận/rảnh."""
+        self._btn_backup_now.setEnabled(enabled)
+        self._btn_rebuild_fts.setEnabled(enabled)
+        self._btn_normalize_source_titles.setEnabled(enabled)
+        self._btn_refresh_wikilink_catalog.setEnabled(enabled)
+        self._btn_cleanup_unused_notes.setEnabled(enabled)
+        self._btn_audit_source_notes.setEnabled(enabled)
+
+    def set_fts_status(self, text: str) -> None:
+        """Cập nhật nhãn trạng thái FTS."""
+        self._lbl_fts_status.setText(text)
+
     @staticmethod
     def _coerce_bool(value: object, default: bool) -> bool:
         if isinstance(value, bool):
@@ -263,191 +286,31 @@ class SettingsView(QWidget):
         self._apply_mode_badge_style(text)
 
     def _apply_mode_badge_style(self, mode_text: str) -> None:
-        """Áp dụng màu badge cho mode: Global xanh lá, Project xanh dương."""
-        if "Project" in mode_text:
+        """Áp dụng màu badge cho chế độ: Toàn cục xanh lá, Dự án xanh dương."""
+        if "Dự án" in mode_text or "Project" in mode_text:
             style = _MODE_BADGE_BASE + "background-color: #DBEAFE; color: #1E40AF;"
         else:
             style = _MODE_BADGE_BASE + "background-color: #DCFCE7; color: #166534;"
         self._lbl_mode_info.setStyleSheet(style)
 
-    def _do_backup(self) -> None:
-        """Tạo backup ngay."""
-        from config.paths import DATABASE_FILE, BACKUPS_DIR
-        from core.services.backup_service import BackupService
-        try:
-            keep = self._spin_backup_keep.value()
-            svc = BackupService(DATABASE_FILE, BACKUPS_DIR)
-            entry = svc.create_backup()
-            # Lưu cài đặt keep count
-            from core.services.settings_service import SettingsService
-            SettingsService().set("backup_keep_count", keep)
-            QMessageBox.information(
-                self, "Sao lưu thành công", f"Đã tạo backup:\n{entry.path}"
-            )
-        except Exception as exc:
-            QMessageBox.critical(self, "Lỗi sao lưu", str(exc))
+    def _request_backup(self) -> None:
+        self.backup_requested.emit(self._spin_backup_keep.value())
 
-    def _rebuild_fts(self) -> None:
-        """Rebuild FTS index."""
-        self._lbl_fts_status.setText("Đang rebuild...")
-        self._btn_rebuild_fts.setEnabled(False)
-        try:
-            from config.paths import DATABASE_FILE, NOTES_DIR
-            from core.services.search_service import SearchService
-            svc = SearchService(str(DATABASE_FILE), NOTES_DIR)
-            count = svc.rebuild_all()
-            self._lbl_fts_status.setText(f"✓ {count} items đã index")
-        except Exception as exc:
-            self._lbl_fts_status.setText("Lỗi rebuild!")
-            logger.error(f"Rebuild FTS lỗi: {exc}")
-        finally:
-            self._btn_rebuild_fts.setEnabled(True)
+    def _request_rebuild_fts(self) -> None:
+        self.rebuild_fts_requested.emit()
 
-    def _reset_settings(self) -> None:
-        """Khôi phục cài đặt về mặc định."""
-        reply = QMessageBox.question(
-            self,
-            "Khôi phục cài đặt",
-            "Bạn có chắc muốn khôi phục tất cả cài đặt về mặc định?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply == QMessageBox.StandardButton.Yes:
-            from core.services.settings_service import SettingsService
-            SettingsService().reset_to_defaults()
-            self._load_settings()
-            QMessageBox.information(self, "Đã khôi phục", "Cài đặt đã được khôi phục về mặc định.")
+    def _request_reset_settings(self) -> None:
+        self.reset_settings_requested.emit()
 
-    def _normalize_source_note_titles(self) -> None:
-        """Chạy chuẩn hóa title source_note thủ công."""
-        from config.paths import NOTES_DIR
-        from core.services.note_service import NoteService
+    def _request_normalize_source_titles(self) -> None:
+        self.normalize_source_titles_requested.emit()
 
-        self._btn_normalize_source_titles.setEnabled(False)
-        try:
-            updated = NoteService(NOTES_DIR).normalize_source_note_titles()
-            QMessageBox.information(
-                self,
-                "Chuẩn hóa hoàn tất",
-                f"Đã cập nhật {updated} source_note.",
-            )
-            self.source_titles_normalized.emit()
-        except Exception as exc:
-            QMessageBox.critical(self, "Lỗi", str(exc))
-        finally:
-            self._btn_normalize_source_titles.setEnabled(True)
+    def _request_refresh_wikilink_catalog(self) -> None:
+        self.refresh_wikilink_catalog_requested.emit()
 
-    def _refresh_wikilink_catalog(self) -> None:
-        """Làm mới catalog note để popup wikilink lấy dữ liệu sạch nhất."""
-        from config.paths import NOTES_DIR
-        from core.services.note_service import NoteService
+    def _request_cleanup_unused_notes(self) -> None:
+        self.cleanup_unused_notes_requested.emit()
 
-        self._btn_refresh_wikilink_catalog.setEnabled(False)
-        try:
-            stats = NoteService(NOTES_DIR).refresh_wikilink_note_catalog()
-            QMessageBox.information(
-                self,
-                "Đã làm mới catalog note",
-                (
-                    f"Note thiếu file đã soft-delete: {stats.get('soft_deleted_missing_file', 0)}\n"
-                    f"Orphan stub note đã dọn: {stats.get('removed_orphan_stub_notes', 0)}\n"
-                    f"Link stale đã dọn: {stats.get('removed_stale_links', 0)}"
-                ),
-            )
-            self.wikilink_catalog_refreshed.emit()
-        except Exception as exc:
-            QMessageBox.critical(self, "Lỗi", str(exc))
-        finally:
-            self._btn_refresh_wikilink_catalog.setEnabled(True)
-
-    def _cleanup_unused_notes_with_preview(self) -> None:
-        """Preview candidate note không còn dùng và chỉ dọn phần người dùng đã chọn."""
-        from config.paths import NOTES_DIR
-        from core.services.note_service import NoteService
-        from ui.widgets.dialogs.note_cleanup_preview_dialog import NoteCleanupPreviewDialog
-
-        self._btn_cleanup_unused_notes.setEnabled(False)
-        try:
-            svc = NoteService(NOTES_DIR)
-            candidates = svc.get_unused_note_candidates()
-            if not candidates:
-                QMessageBox.information(
-                    self,
-                    "Không có note cần dọn",
-                    "Hiện tại không phát hiện note không còn dùng.",
-                )
-                return
-
-            dlg = NoteCleanupPreviewDialog(candidates, self)
-            if dlg.exec() != dlg.DialogCode.Accepted:
-                return
-
-            selected_ids = dlg.selected_note_ids
-            if not selected_ids:
-                QMessageBox.information(
-                    self,
-                    "Chưa dọn note nào",
-                    "Bạn đã chọn giữ lại toàn bộ note trong danh sách preview.",
-                )
-                return
-
-            stats = svc.cleanup_unused_notes(selected_ids)
-            QMessageBox.information(
-                self,
-                "Đã áp dụng dọn note",
-                (
-                    f"Đã soft-delete: {stats.get('soft_deleted', 0)} note\n"
-                    f"Đã dọn stale links: {stats.get('removed_stale_links', 0)}"
-                ),
-            )
-            self.wikilink_catalog_refreshed.emit()
-        except Exception as exc:
-            QMessageBox.critical(self, "Lỗi", str(exc))
-        finally:
-            self._btn_cleanup_unused_notes.setEnabled(True)
-
-    def _audit_missing_source_note_files(self) -> None:
-        """Quét read-only source_note thiếu file và hiển thị báo cáo nhanh."""
-        from config.paths import NOTES_DIR
-        from core.services.note_service import NoteService
-
-        self._btn_audit_source_notes.setEnabled(False)
-        try:
-            issues = NoteService(NOTES_DIR).audit_missing_source_note_files()
-            if not issues:
-                QMessageBox.information(
-                    self,
-                    "Kiểm tra source-note",
-                    "Không phát hiện source-note nào bị thiếu file markdown.",
-                )
-                return
-
-            preview_lines: list[str] = []
-            for item in issues[:20]:
-                code = item.get("source_code") or "----"
-                sid = item.get("source_id") or "?"
-                nid = item.get("note_id") or "?"
-                title = item.get("note_title") or "(không tiêu đề)"
-                preview_lines.append(f"- [{code}|source={sid}|note={nid}] {title}")
-
-            more = ""
-            if len(issues) > 20:
-                more = f"\n... và {len(issues) - 20} mục khác."
-
-            preview_text = "\n".join(preview_lines)
-
-            QMessageBox.warning(
-                self,
-                "Phát hiện source-note thiếu file",
-                (
-                    f"Tổng số phát hiện: {len(issues)}\n\n"
-                    "Danh sách mẫu:\n"
-                    f"{preview_text}"
-                    f"{more}\n\n"
-                    "Đây là thao tác chỉ xem. Không có thay đổi dữ liệu."
-                ),
-            )
-        except Exception as exc:
-            QMessageBox.critical(self, "Lỗi", str(exc))
-        finally:
-            self._btn_audit_source_notes.setEnabled(True)
+    def _request_audit_missing_source_note_files(self) -> None:
+        self.audit_missing_source_note_files_requested.emit()
 
